@@ -53,7 +53,6 @@ export function createApp(): express.Express {
   );
 
   // Serve static files in production
-  console.log("[Server] Running in production mode with static files");
   serveStatic(app);
 
   return app;
@@ -83,15 +82,20 @@ async function startServer() {
   });
 }
 
-// On Vercel, export the handler for serverless runtime
-if (process.env.VERCEL) {
-  const app = createApp();
-  // Initialize demo users before first request
-  initializeDemoUsers().catch(console.error);
-  module.exports = app;
-  module.exports.default = app;
+// Vercel serverless: always initialize demo users and export the app
+// For local development: start server directly
+const isVercel = !!process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+// Initialize demo users
+initializeDemoUsers().catch((err) => {
+  console.warn("[Server] Demo users init:", err.message);
+});
+
+// For Vercel: export the Express app as the default export
+// For local: start the server
+if (isVercel) {
+  // The api/index.js wrapper will import this and use createApp()
 } else {
-  // Local development: start the server directly
   startServer().catch((error) => {
     console.error("[Server] Failed to start:", error);
     process.exit(1);

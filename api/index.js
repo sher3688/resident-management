@@ -1,38 +1,28 @@
-// Vercel serverless entry point - combines backend API and frontend static files
-const path = require("path");
-const fs = require("fs");
-const express = require("express");
+// Vercel serverless entry point - ESM
+// This file combines the backend Express app with frontend static file serving
 
-const app = express();
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+import express from "express";
 
-// Body parsing
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Try to load the backend bundle
-try {
-  process.env.VERCEL = "1";
-  const distPath = path.resolve(__dirname, "..", "dist", "server", "index.js");
-  if (fs.existsSync(distPath)) {
-    const serverModule = require(distPath);
-    // serverModule should be the Express app returned by createApp()
-    if (serverModule && serverModule._router) {
-      app.use(serverModule);
-      console.log("[Vercel] Backend loaded successfully from dist/server/index.js");
-    }
-  }
-} catch (err) {
-  console.warn("[Vercel] Backend load warning:", err.message);
-}
+// Import the bundled server (ESM format)
+import { createApp } from "../dist/server/index.js";
+
+// Create the Express app with all backend routes (tRPC, auth, upload, etc.)
+const app = createApp();
 
 // Serve static frontend files
 const staticPath = path.resolve(__dirname, "..", "dist", "public");
 if (fs.existsSync(staticPath)) {
   app.use(express.static(staticPath));
-  console.log("[Vercel] Static files:", staticPath);
+  console.log("[Vercel] Serving static files from:", staticPath);
 }
 
-// SPA fallback
+// SPA fallback - serve index.html for unmatched GET requests
 app.get("*", (_req, res) => {
   const indexPath = path.resolve(staticPath, "index.html");
   if (fs.existsSync(indexPath)) {
@@ -42,4 +32,5 @@ app.get("*", (_req, res) => {
   }
 });
 
-module.exports = app;
+// Export for Vercel serverless
+export default app;
