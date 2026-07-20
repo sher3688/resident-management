@@ -1,8 +1,18 @@
-import { mysqlTable, mysqlEnum, varchar, int, timestamp, text, json, date } from "drizzle-orm/mysql-core";
+import { pgTable, pgEnum, varchar, integer, timestamp, text, jsonb, date } from "drizzle-orm/pg-core";
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+export const parkingTypeEnum = pgEnum("parking_type", ["car", "motorcycle", "bicycle"]);
+export const repairStatusEnum = pgEnum("repair_status", ["pending", "in_progress", "completed", "cancelled", "resident_self_repair"]);
+export const loginMethodEnum = pgEnum("login_method", ["email", "password"]);
+export const roleEnum = pgEnum("role", ["admin", "user"]);
+export const renovationStatusEnum = pgEnum("renovation_status", ["pending", "approved", "completed", "rejected"]);
+export const decorationDepositStatusEnum = pgEnum("decoration_deposit_status", ["notPaid", "paid", "refunded"]);
+export const operationLogStatusEnum = pgEnum("operation_log_status", ["success", "failure"]);
+export const invitedStatusEnum = pgEnum("invited_status", ["pending", "accepted", "rejected"]);
 
 // ─── 住戶表 ────────────────────────────────────────────────────────────────
-export const residents = mysqlTable("residents", {
-  id: int("id").autoincrement().primaryKey(),
+export const residents = pgTable("residents", {
+  id: integer("id").serial().primaryKey(),
 
   // 戶號
   unitNumber: varchar("unitNumber", { length: 32 }).notNull(),
@@ -58,135 +68,129 @@ export const residents = mysqlTable("residents", {
   // 備註
   notes: text("notes"),
 
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Resident = typeof residents.$inferSelect;
 export type InsertResident = typeof residents.$inferInsert;
 
 // ─── 同住人表（規範化） ────────────────────────────────────────────────────
-export const coResidents = mysqlTable("co_residents", {
-  id: int("id").autoincrement().primaryKey(),
-  residentId: int("residentId").notNull(),
+export const coResidents = pgTable("co_residents", {
+  id: integer("id").serial().primaryKey(),
+  residentId: integer("residentId").notNull(),
   name: varchar("name", { length: 64 }).notNull(),
   phone: varchar("phone", { length: 32 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type CoResident = typeof coResidents.$inferSelect;
 export type InsertCoResident = typeof coResidents.$inferInsert;
 
 // ─── 車位表（規範化） ────────────────────────────────────────────────────
-export const parkings = mysqlTable("parkings", {
-  id: int("id").autoincrement().primaryKey(),
-  residentId: int("residentId").notNull(),
-  type: mysqlEnum("type", ["car", "motorcycle", "bicycle"]).notNull(),
+export const parkings = pgTable("parkings", {
+  id: integer("id").serial().primaryKey(),
+  residentId: integer("residentId").notNull(),
+  type: parkingTypeEnum("type").notNull(),
   number: varchar("number", { length: 32 }).notNull(),
   plate: varchar("plate", { length: 32 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type Parking = typeof parkings.$inferSelect;
 export type InsertParking = typeof parkings.$inferInsert;
 
 // ─── 停車位牌照表（一個停車位可以有多個牌照） ────────────────────────────────
-export const parkingPlates = mysqlTable("parking_plates", {
-  id: int("id").autoincrement().primaryKey(),
-  parkingId: int("parkingId").notNull(),
+export const parkingPlates = pgTable("parking_plates", {
+  id: integer("id").serial().primaryKey(),
+  parkingId: integer("parkingId").notNull(),
   plate: varchar("plate", { length: 32 }).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ParkingPlate = typeof parkingPlates.$inferSelect;
 export type InsertParkingPlate = typeof parkingPlates.$inferInsert;
 
 // ─── 緊急聯絡人表（規範化） ────────────────────────────────────────────────
-export const emergencyContacts = mysqlTable("emergency_contacts", {
-  id: int("id").autoincrement().primaryKey(),
-  residentId: int("residentId").notNull(),
+export const emergencyContacts = pgTable("emergency_contacts", {
+  id: integer("id").serial().primaryKey(),
+  residentId: integer("residentId").notNull(),
   name: varchar("name", { length: 64 }).notNull(),
   phone: varchar("phone", { length: 32 }),
   relationship: varchar("relationship", { length: 32 }),
   address: text("address"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type EmergencyContact = typeof emergencyContacts.$inferSelect;
 export type InsertEmergencyContact = typeof emergencyContacts.$inferInsert;
 
 // ─── 報修統計表 ────────────────────────────────────────────────────────────────
-export const repairRequests = mysqlTable("repair_requests", {
-  id: int("id").autoincrement().primaryKey(),
+export const repairRequests = pgTable("repair_requests", {
+  id: integer("id").serial().primaryKey(),
   repairDate: varchar("repairDate", { length: 32 }).notNull(),
   unitNumber: varchar("unitNumber", { length: 32 }).notNull(),
   description: text("description").notNull(),
-  status: mysqlEnum("status", [
-    "pending",
-    "in_progress",
-    "completed",
-    "cancelled",
-    "resident_self_repair",
-  ]).default("pending"),
+  status: repairStatusEnum("status").default("pending"),
   notes: text("notes"),
   completionDate: varchar("completionDate", { length: 32 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type RepairRequest = typeof repairRequests.$inferSelect;
 export type InsertRepairRequest = typeof repairRequests.$inferInsert;
 
 // ─── 操作日誌表 ────────────────────────────────────────────────────────────────
-export const auditLogs = mysqlTable("audit_logs", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const auditLogs = pgTable("audit_logs", {
+  id: integer("id").serial().primaryKey(),
+  userId: integer("userId").notNull(),
   action: varchar("action", { length: 50 }).notNull(),
   entity: varchar("entity", { length: 50 }).notNull(),
-  entityId: int("entityId"),
+  entityId: integer("entityId"),
   changes: text("changes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 // ─── 帳密使用者表 ────────────────────────────────────────────────────────────────
-export const passwordUsers = mysqlTable("password_users", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+export const passwordUsers = pgTable("password_users", {
+  id: integer("id").serial().primaryKey(),
+  userId: integer("userId").notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type PasswordUser = typeof passwordUsers.$inferSelect;
 export type InsertPasswordUser = typeof passwordUsers.$inferInsert;
 
 // ─── 使用者表 ────────────────────────────────────────────────────────────────
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const users = pgTable("users", {
+  id: integer("id").serial().primaryKey(),
   openId: varchar("openId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 64 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  loginMethod: mysqlEnum("loginMethod", ["email", "password"]).default("email"),
-  role: mysqlEnum("role", ["admin", "user"]).default("user"),
-  isActive: int("isactive").default(1).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn"),
+  loginMethod: loginMethodEnum("loginMethod").default("email"),
+  role: roleEnum("role").default("user"),
+  isActive: integer("isActive").default(1).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // ─── 裝修申請表 ────────────────────────────────────────────────────────────────
-export const renovationApplications = mysqlTable("renovation_applications", {
-  id: int("id").autoincrement().primaryKey(),
+export const renovationApplications = pgTable("renovation_applications", {
+  id: integer("id").serial().primaryKey(),
   unitNumber: varchar("unitNumber", { length: 32 }).notNull(),
   applicationDate: varchar("applicationDate", { length: 32 }).notNull(),
   constructionStartDate: varchar("constructionStartDate", { length: 32 }),
@@ -196,68 +200,68 @@ export const renovationApplications = mysqlTable("renovation_applications", {
   applicantName: varchar("applicantName", { length: 64 }).notNull(),
   applicantPhone: varchar("applicantPhone", { length: 32 }).notNull(),
   registeredBy: varchar("registeredBy", { length: 64 }),
-  status: mysqlEnum("status", ["pending", "approved", "completed", "rejected"]).default("pending"),
+  status: renovationStatusEnum("status").default("pending"),
   decorationDeposit: varchar("decorationDeposit", { length: 32 }),
-  decorationDepositStatus: mysqlEnum("decorationDepositStatus", ["notPaid", "paid", "refunded"]).default("notPaid"),
+  decorationDepositStatus: decorationDepositStatusEnum("decorationDepositStatus").default("notPaid"),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type RenovationApplication = typeof renovationApplications.$inferSelect;
 export type InsertRenovationApplication = typeof renovationApplications.$inferInsert;
 
 // 操作日誌表
-export const operationLogs = mysqlTable("operation_logs", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  action: varchar("action", { length: 64 }).notNull(), // e.g., "create_resident", "update_repair", "delete_application"
-  module: varchar("module", { length: 64 }).notNull(), // e.g., "residents", "repairs", "renovations"
-  targetId: int("targetId"), // ID of the affected record
-  targetType: varchar("targetType", { length: 64 }), // Type of the affected record
-  description: text("description"), // Human-readable description
-  details: json("details"), // Additional details in JSON format
-  ipAddress: varchar("ipAddress", { length: 45 }), // IPv4 or IPv6
-  userAgent: text("userAgent"), // Browser/client info
-  status: mysqlEnum("status", ["success", "failure"]).default("success"),
-  errorMessage: text("errorMessage"), // Error message if status is failure
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+export const operationLogs = pgTable("operation_logs", {
+  id: integer("id").serial().primaryKey(),
+  userId: integer("userId").notNull(),
+  action: varchar("action", { length: 64 }).notNull(),
+  module: varchar("module", { length: 64 }).notNull(),
+  targetId: integer("targetId"),
+  targetType: varchar("targetType", { length: 64 }),
+  description: text("description"),
+  details: jsonb("details"),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  userAgent: text("userAgent"),
+  status: operationLogStatusEnum("status").default("success"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type OperationLog = typeof operationLogs.$inferSelect;
 export type InsertOperationLog = typeof operationLogs.$inferInsert;
 
 // 使用者登入時段表 - 追蹤用戶登入時間和設備
-export const userSessions = mysqlTable("user_sessions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+export const userSessions = pgTable("user_sessions", {
+  id: integer("id").serial().primaryKey(),
+  userId: integer("userId").notNull(),
   sessionToken: varchar("sessionToken", { length: 255 }).notNull().unique(),
   ipAddress: varchar("ipAddress", { length: 45 }),
   userAgent: text("userAgent"),
-  deviceName: varchar("deviceName", { length: 255 }), // Device identifier
-  loginAt: timestamp("loginAt").defaultNow().notNull(),
-  lastActivityAt: timestamp("lastActivityAt").defaultNow().notNull(),
-  logoutAt: timestamp("logoutAt"),
-  isActive: int("isActive").default(1).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  deviceName: varchar("deviceName", { length: 255 }),
+  loginAt: timestamp("loginAt", { withTimezone: true }).defaultNow().notNull(),
+  lastActivityAt: timestamp("lastActivityAt", { withTimezone: true }).defaultNow().notNull(),
+  logoutAt: timestamp("logoutAt", { withTimezone: true }),
+  isActive: integer("isActive").default(1).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type UserSession = typeof userSessions.$inferSelect;
 export type InsertUserSession = typeof userSessions.$inferInsert;
 
 // ─── 受邀人員表 ────────────────────────────────────────────────────────────────
-export const invitedUsers = mysqlTable("invited_users", {
-  id: int("id").autoincrement().primaryKey(),
+export const invitedUsers = pgTable("invited_users", {
+  id: integer("id").serial().primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 64 }),
-  role: varchar("role", { length: 32 }).default("user").notNull(), // admin or user
-  status: varchar("status", { length: 32 }).default("pending").notNull(), // pending, accepted, rejected
-  invitedBy: int("invitedBy"), // User ID who invited
-  invitedAt: timestamp("invitedAt").defaultNow().notNull(),
-  acceptedAt: timestamp("acceptedAt"),
+  role: varchar("role", { length: 32 }).default("user").notNull(),
+  status: varchar("status", { length: 32 }).default("pending").notNull(),
+  invitedBy: integer("invitedBy"),
+  invitedAt: timestamp("invitedAt", { withTimezone: true }).defaultNow().notNull(),
+  acceptedAt: timestamp("acceptedAt", { withTimezone: true }),
   notes: text("notes"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type InvitedUser = typeof invitedUsers.$inferSelect;
@@ -265,28 +269,28 @@ export type InsertInvitedUser = typeof invitedUsers.$inferInsert;
 
 // 資源庫表
 // 資源文件夾表
-export const resourceFolders = mysqlTable("resource_folders", {
-  id: int("id").autoincrement().primaryKey(),
+export const resourceFolders = pgTable("resource_folders", {
+  id: integer("id").serial().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ResourceFolder = typeof resourceFolders.$inferSelect;
 export type InsertResourceFolder = typeof resourceFolders.$inferInsert;
 
 // 資源檔案表
-export const resourceFiles = mysqlTable("resource_files", {
-  id: int("id").autoincrement().primaryKey(),
-  folderId: int("folderId").notNull().references(() => resourceFolders.id, { onDelete: "cascade" }),
+export const resourceFiles = pgTable("resource_files", {
+  id: integer("id").serial().primaryKey(),
+  folderId: integer("folderId").notNull().references(() => resourceFolders.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
-  fileSize: int("fileSize"),
+  fileSize: integer("fileSize"),
   fileType: varchar("fileType", { length: 32 }).default("pdf"),
-  uploadedBy: int("uploadedBy"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  uploadedBy: integer("uploadedBy"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type ResourceFile = typeof resourceFiles.$inferSelect;

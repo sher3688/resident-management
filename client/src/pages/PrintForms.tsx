@@ -571,7 +571,6 @@ export default function PrintFormsPage() {
 
 
     if (previewType === "move-in-notice") {
-      const pdfUrl = "/manus-storage/move-in-notice-user_3568220a.pdf";
       return (
         <div>
           <div className="header">
@@ -583,48 +582,11 @@ export default function PrintFormsPage() {
             <div style={{ marginBottom: "24px" }}>
               <FileText style={{ width: "64px", height: "64px", color: "#2563eb", margin: "0 auto 16px" }} />
               <h2 style={{ fontSize: "18pt", fontWeight: "700", marginBottom: "8px" }}>入住須知文件</h2>
-              <p style={{ fontSize: "10.5pt", color: "#666", marginBottom: "16px" }}>點擊下方按鈕在您的設備上打開或下載入住須知文件</p>
+              <p style={{ fontSize: "10.5pt", color: "#666", marginBottom: "16px" }}>請聯繫管理員上傳入住須知文件</p>
             </div>
 
-            <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
-              <a href={pdfUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <button style={{
-                  padding: "12px 24px",
-                  backgroundColor: "#b8860b",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "6px",
-                  fontSize: "11pt",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px"
-                }}>
-                  📄 在線查看入住須知
-                </button>
-              </a>
-              <a href={pdfUrl} download="住戶入住須知.pdf" style={{ textDecoration: "none" }}>
-                <button style={{
-                  padding: "12px 24px",
-                  backgroundColor: "white",
-                  color: "#333",
-                  border: "1px solid #ccc",
-                  borderRadius: "6px",
-                  fontSize: "11pt",
-                  fontWeight: "600",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px"
-                }}>
-                  ⬇️ 下載入住須知 PDF
-                </button>
-              </a>
-            </div>
-
-            <p style={{ fontSize: "9pt", color: "#999", marginTop: "16px" }}>
-              建議使用 PDF 閱讀器應用程式以獲得最佳閱讀體驗
+            <p style={{ fontSize: "10pt", color: "#999" }}>
+              目前系統尚未設定入住須知文件，管理員可透過後台資源庫上傳相關文件。
             </p>
           </div>
         </div>

@@ -43,8 +43,8 @@ function LoginForm() {
   // 登入 mutation
   const loginMutation = trpc.auth.passwordAuth.login.useMutation({
     onSuccess: (data) => {
-      // 登入成功，儲存 token 到 localStorage
-      localStorage.setItem("passwordAuthToken", String(data.id));
+      // 登入成功，儲存 JWT token 到 localStorage
+      localStorage.setItem("passwordAuthToken", data.token || String(data.id));
       localStorage.setItem("passwordAuthUser", JSON.stringify(data));
       // 觸發自定義事件，通知 useAuth hook 更新
       window.dispatchEvent(new Event('passwordAuthUserChanged'));

@@ -1,14 +1,28 @@
-import { and, eq, like, or, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, residents, repairRequests, InsertResident, InsertRepairRequest, parkings, parkingPlates, InsertParkingPlate, operationLogs, userSessions, InsertOperationLog, InsertUserSession, invitedUsers, InsertInvitedUser, emergencyContacts, InsertEmergencyContact, EmergencyContact } from "../drizzle/schema";
+import { and, eq, like, or, desc, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { InsertUser, users, residents, repairRequests, InsertResident, InsertRepairRequest, parkings, parkingPlates, InsertParkingPlate, operationLogs, userSessions, InsertOperationLog, InsertUserSession, invitedUsers, InsertInvitedUser, emergencyContacts, InsertEmergencyContact, EmergencyContact, renovationApplications, InsertRenovationApplication, resourceFolders, resourceFiles, coResidents, passwordUsers as passwordUsersTable } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
+let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
+async function getPool(): Promise<Pool> {
+  if (!_pool) {
+    _pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 10,
+    });
+  }
+  return _pool;
+}
+
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const pool = await getPool();
+      _db = drizzle(pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -17,24 +31,43 @@ export async function getDb() {
   return _db;
 }
 
+// Helper to get insert ID from PostgreSQL
+async function getInsertId(db: any, table: any, data: any): Promise<number> {
+  const result = await db.insert(table).values(data).returning({ id: table.id });
+  return result[0]?.id;
+}
+
 // ─── User helpers ─────────────────────────────────────────────────────────────
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
   if (!db) { console.warn("[Database] Cannot upsert user: database not available"); return; }
   try {
-    const values: InsertUser = { openId: user.openId, name: user.name || '', email: user.email || '' };
-    const updateSet: Record<string, unknown> = {};
-    if (user.name) updateSet.name = user.name;
-    if (user.email) updateSet.email = user.email;
-    if (user.loginMethod) updateSet.loginMethod = user.loginMethod;
-
-    if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
-    if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-    else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
-    if (!values.lastSignedIn) values.lastSignedIn = new Date();
-    if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    const values: any = { openId: user.openId, name: user.name || '', email: user.email || '' };
+    
+    // Check if user exists
+    const existing = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1);
+    
+    if (existing.length > 0) {
+      // Update existing user
+      const updateData: any = {};
+      if (user.name) updateData.name = user.name;
+      if (user.email) updateData.email = user.email;
+      if (user.loginMethod) updateData.loginMethod = user.loginMethod;
+      if (user.role !== undefined) updateData.role = user.role;
+      if (user.lastSignedIn !== undefined) updateData.lastSignedIn = user.lastSignedIn;
+      if (!updateData.lastSignedIn) updateData.lastSignedIn = new Date();
+      updateData.updatedAt = new Date();
+      await db.update(users).set(updateData).where(eq(users.openId, user.openId));
+    } else {
+      // Insert new user
+      if (user.lastSignedIn === undefined) values.lastSignedIn = new Date();
+      if (user.role === undefined && user.openId === ENV.ownerOpenId) values.role = 'admin';
+      if (values.lastSignedIn === undefined) values.lastSignedIn = new Date();
+      values.createdAt = new Date();
+      values.updatedAt = new Date();
+      await db.insert(users).values(values);
+    }
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -103,14 +136,17 @@ export async function getResidentById(id: number) {
 export async function createResident(data: Omit<InsertResident, 'id' | 'createdAt' | 'updatedAt'>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(residents).values(data);
-  return result;
+  const insertData: any = { ...data };
+  const newId = await getInsertId(db, residents, insertData);
+  const created = await getResidentById(newId);
+  return { insertId: newId, ...created };
 }
 
 export async function updateResident(id: number, data: Partial<Omit<InsertResident, 'id' | 'createdAt' | 'updatedAt'>>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(residents).set(data).where(eq(residents.id, id));
+  const updateData: any = { ...data, updatedAt: new Date() };
+  await db.update(residents).set(updateData).where(eq(residents.id, id));
   // 返回更新後的資料
   return getResidentById(id);
 }
@@ -137,15 +173,16 @@ export async function getParkingPlatesByParkingId(parkingId: number) {
 export async function createParking(data: { residentId: number; type: 'car' | 'motorcycle' | 'bicycle'; number: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(parkings).values(data);
-  // Drizzle 返回 [ResultSetHeader, undefined]，insertId 在 result[0].insertId
-  return { insertId: (result as any)[0]?.insertId };
+  const insertData: any = { ...data };
+  const newId = await getInsertId(db, parkings, insertData);
+  return { insertId: newId };
 }
 
 export async function updateParking(id: number, data: { number?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return await db.update(parkings).set(data).where(eq(parkings.id, id));
+  const updateData: any = { ...data, updatedAt: new Date() };
+  return await db.update(parkings).set(updateData).where(eq(parkings.id, id));
 }
 
 export async function deleteParking(id: number) {
@@ -160,9 +197,9 @@ export async function deleteParking(id: number) {
 export async function addParkingPlate(parkingId: number, plate: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(parkingPlates).values({ parkingId, plate });
-  // Drizzle 返回 [ResultSetHeader, undefined]，insertId 在 result[0].insertId
-  return { insertId: (result as any)[0]?.insertId };
+  const insertData: any = { parkingId, plate };
+  const newId = await getInsertId(db, parkingPlates, insertData);
+  return { insertId: newId };
 }
 
 export async function deleteParkingPlate(id: number) {
@@ -188,14 +225,16 @@ export async function getEmergencyContactsByResidentId(residentId: number): Prom
 export async function createEmergencyContact(data: Omit<InsertEmergencyContact, 'id' | 'createdAt' | 'updatedAt'>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(emergencyContacts).values(data);
-  return { insertId: (result as any)[0]?.insertId };
+  const insertData: any = { ...data };
+  const newId = await getInsertId(db, emergencyContacts, insertData);
+  return { insertId: newId };
 }
 
 export async function updateEmergencyContact(id: number, data: Partial<Omit<InsertEmergencyContact, 'id' | 'createdAt' | 'updatedAt'>>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return await db.update(emergencyContacts).set(data).where(eq(emergencyContacts.id, id));
+  const updateData: any = { ...data, updatedAt: new Date() };
+  return await db.update(emergencyContacts).set(updateData).where(eq(emergencyContacts.id, id));
 }
 
 export async function deleteEmergencyContact(id: number) {
@@ -234,13 +273,16 @@ export async function getRepairRequestById(id: number) {
 export async function createRepairRequest(data: Omit<InsertRepairRequest, 'id' | 'createdAt' | 'updatedAt'>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return await db.insert(repairRequests).values(data);
+  const insertData: any = { ...data };
+  const newId = await getInsertId(db, repairRequests, insertData);
+  return await getRepairRequestById(newId);
 }
 
 export async function updateRepairRequest(id: number, data: Partial<Omit<InsertRepairRequest, 'id' | 'createdAt' | 'updatedAt'>>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(repairRequests).set(data).where(eq(repairRequests.id, id));
+  const updateData: any = { ...data, updatedAt: new Date() };
+  await db.update(repairRequests).set(updateData).where(eq(repairRequests.id, id));
   // 返回更新後的完整紀錄
   return await db.select().from(repairRequests).where(eq(repairRequests.id, id)).then(rows => rows[0]);
 }
@@ -261,7 +303,7 @@ export async function listAllUsers() {
 export async function updateUserRole(openId: string, role: 'admin' | 'user') {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  return await db.update(users).set({ role }).where(eq(users.openId, openId));
+  return await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.openId, openId));
 }
 
 // ─── Backup helpers ──────────────────────────────────────────────────────────
@@ -290,7 +332,8 @@ export async function restoreResidents(data: any[]) {
   
   for (const resident of data) {
     try {
-      await db.insert(residents).values(resident);
+      const { id, createdAt, updatedAt, ...insertData } = resident;
+      await db.insert(residents).values(insertData);
       successCount++;
     } catch (error: any) {
       errorCount++;
@@ -311,7 +354,8 @@ export async function restoreRepairRequests(data: any[]) {
   
   for (const request of data) {
     try {
-      await db.insert(repairRequests).values(request);
+      const { id, createdAt, updatedAt, ...insertData } = request;
+      await db.insert(repairRequests).values(insertData);
       successCount++;
     } catch (error: any) {
       errorCount++;
@@ -332,7 +376,7 @@ export async function logOperation(log: InsertOperationLog): Promise<void> {
   const db = await getDb();
   if (!db) { console.warn("[Database] Cannot log operation: database not available"); return; }
   try {
-    await db.insert(operationLogs).values(log);
+    await db.insert(operationLogs).values(log as any);
   } catch (error) {
     console.error("[Database] Failed to log operation:", error);
     // Don't throw - logging failures shouldn't break the main operation
@@ -385,8 +429,9 @@ export async function createUserSession(session: InsertUserSession): Promise<num
   const db = await getDb();
   if (!db) { console.warn("[Database] Cannot create session: database not available"); return null; }
   try {
-    const result = await db.insert(userSessions).values(session);
-    return result[0].insertId || null;
+    const insertData: any = { ...session };
+    const newId = await getInsertId(db, userSessions, insertData);
+    return newId || null;
   } catch (error) {
     console.error("[Database] Failed to create session:", error);
     return null;
@@ -464,16 +509,15 @@ export async function addInvitedUser(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(invitedUsers).values({
+  const insertData: any = {
     email,
     name,
     role,
     invitedBy,
     notes,
     status: "pending",
-  });
-
-  return result;
+  };
+  return getInsertId(db, invitedUsers, insertData);
 }
 
 /**
@@ -511,7 +555,8 @@ export async function updateInvitedUser(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(invitedUsers).set(updates).where(eq(invitedUsers.id, id));
+  const updateData: any = { ...updates, updatedAt: new Date() };
+  await db.update(invitedUsers).set(updateData).where(eq(invitedUsers.id, id));
 
   return getInvitedUserById(id);
 }
@@ -549,4 +594,112 @@ export async function deleteInvitedUser(id: number) {
 export async function isEmailInvited(email: string) {
   const invited = await getInvitedUserByEmail(email);
   return !!invited;
+}
+
+// ─── Renovation Applications helpers ──────────────────────────────────────────
+export async function listRenovationApplications(filters?: { status?: string }) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (filters?.status && filters.status !== 'all') {
+    conditions.push(eq(renovationApplications.status, filters.status as any));
+  }
+  if (conditions.length > 0) {
+    return await db.select().from(renovationApplications).where(and(...conditions)).orderBy(renovationApplications.createdAt);
+  }
+  return await db.select().from(renovationApplications).orderBy(renovationApplications.createdAt);
+}
+
+export async function getRenovationApplicationById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(renovationApplications).where(eq(renovationApplications.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createRenovationApplication(data: Omit<InsertRenovationApplication, 'id' | 'createdAt' | 'updatedAt'>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const insertData: any = { ...data };
+  const newId = await getInsertId(db, renovationApplications, insertData);
+  return await getRenovationApplicationById(newId);
+}
+
+export async function updateRenovationApplication(id: number, data: Partial<Omit<InsertRenovationApplication, 'id' | 'createdAt' | 'updatedAt'>>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const updateData: any = { ...data, updatedAt: new Date() };
+  await db.update(renovationApplications).set(updateData).where(eq(renovationApplications.id, id));
+  return await getRenovationApplicationById(id);
+}
+
+export async function deleteRenovationApplication(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.delete(renovationApplications).where(eq(renovationApplications.id, id));
+}
+
+// ─── Resource Library helpers ──────────────────────────────────────────────────
+export async function listResourceFolders() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(resourceFolders).orderBy(resourceFolders.createdAt);
+}
+
+export async function getResourceFolderById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(resourceFolders).where(eq(resourceFolders.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createResourceFolder(data: { name: string; description?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const insertData: any = { name: data.name, description: data.description || null };
+  const newId = await getInsertId(db, resourceFolders, insertData);
+  return await getResourceFolderById(newId);
+}
+
+export async function updateResourceFolder(id: number, data: { name?: string; description?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const updateData: any = { ...data, updatedAt: new Date() };
+  await db.update(resourceFolders).set(updateData).where(eq(resourceFolders.id, id));
+  return await getResourceFolderById(id);
+}
+
+export async function deleteResourceFolder(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Delete all files in the folder first
+  await db.delete(resourceFiles).where(eq(resourceFiles.folderId, id));
+  return await db.delete(resourceFolders).where(eq(resourceFolders.id, id));
+}
+
+export async function listResourceFilesByFolderId(folderId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(resourceFiles).where(eq(resourceFiles.folderId, folderId)).orderBy(resourceFiles.createdAt);
+}
+
+export async function getResourceFileById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(resourceFiles).where(eq(resourceFiles.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createResourceFile(data: { folderId: number; name: string; fileUrl: string; fileSize?: number; fileType?: string; uploadedBy?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const insertData: any = { ...data };
+  const newId = await getInsertId(db, resourceFiles, insertData);
+  return await getResourceFileById(newId);
+}
+
+export async function deleteResourceFile(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.delete(resourceFiles).where(eq(resourceFiles.id, id));
 }

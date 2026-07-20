@@ -1,10 +1,13 @@
 /**
  * tRPC 帳密驗證路由
- * 使用簡化的內存驗證系統
+ * 使用 JWT token 進行身份驗證
  */
 
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { getSessionCookieOptions } from "./_core/cookies";
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
+import { sdk } from "./_core/sdk";
 import {
   authenticatePasswordUser,
   registerPasswordUser,
@@ -15,7 +18,7 @@ import {
 export const passwordAuthRouter = router({
   /**
    * 帳密登入
-   * 返回使用者資訊和 session token
+   * 返回使用者資訊和 session token（同時設定 cookie）
    */
   login: publicProcedure
     .input(
@@ -24,17 +27,28 @@ export const passwordAuthRouter = router({
         password: z.string().min(1, "密碼不能為空"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const user = await authenticatePasswordUser(input.username, input.password);
       if (!user) {
         throw new Error("使用者名稱或密碼錯誤");
       }
+
+      // Create JWT token
+      const token = await sdk.createSessionToken(user.id, {
+        name: user.name,
+        expiresInMs: ONE_YEAR_MS,
+      });
+
+      // Set cookie for browser-based auth
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       return {
         id: user.id,
         username: user.username,
         name: user.name,
         role: user.role,
+        token: token,
       };
     }),
 
