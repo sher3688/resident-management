@@ -1,14 +1,12 @@
 {
+  "version": 2,
   "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
   "outputDirectory": "dist",
-  "framework": null,
   "builds": [
     {
       "src": "dist/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["dist/public/**", "dist/**"]
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [

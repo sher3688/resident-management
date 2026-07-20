@@ -5,7 +5,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./vite";
 import { residentsExportRouter } from "../residents-export";
 import { initializeDemoUsers } from "../password-auth";
 import uploadRoutes from "../upload-routes";
@@ -29,6 +29,36 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+// Create the Express app and configure all routes
+export function createApp(): express.Express {
+  const app = express();
+
+  // Configure body parser with larger size limit for file uploads
+  app.use(express.json({ limit: "50mb" }));
+  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Residents export API
+  app.use("/api/residents", residentsExportRouter);
+
+  // File upload API
+  app.use("/api", uploadRoutes);
+
+  // tRPC API
+  app.use(
+    "/api/trpc",
+    createExpressMiddleware({
+      router: appRouter,
+      createContext,
+    })
+  );
+
+  // Serve static files in production
+  console.log("[Server] Running in production mode with static files");
+  serveStatic(app);
+
+  return app;
+}
+
 async function startServer() {
   // Auto-initialize demo users (admin/admin123)
   try {
@@ -38,31 +68,8 @@ async function startServer() {
     console.error("Failed to initialize demo users:", error);
   }
 
-  const app = express();
+  const app = createApp();
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Residents export API
-  app.use("/api/residents", residentsExportRouter);
-  // File upload API
-  app.use("/api", uploadRoutes);
-  // tRPC API
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
-    console.log("[Server] Running in development mode with Vite");
-    await setupVite(app, server);
-  } else {
-    console.log("[Server] Running in production mode with static files");
-    serveStatic(app);
-  }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
@@ -76,7 +83,17 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error("[Server] Failed to start:", error);
-  process.exit(1);
-});
+// On Vercel, export the handler for serverless runtime
+if (process.env.VERCEL) {
+  const app = createApp();
+  // Initialize demo users before first request
+  initializeDemoUsers().catch(console.error);
+  module.exports = app;
+  module.exports.default = app;
+} else {
+  // Local development: start the server directly
+  startServer().catch((error) => {
+    console.error("[Server] Failed to start:", error);
+    process.exit(1);
+  });
+}
