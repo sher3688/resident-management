@@ -1,19 +1,36 @@
-// Vercel serverless entry point
-// We need to load the bundled server and get the Express app
-
+// Vercel serverless entry point - combines backend API and frontend static files
 const path = require("path");
 const fs = require("fs");
-
-// Create a new Express app that serves the frontend
 const express = require("express");
+
 const app = express();
 
+// Body parsing
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Serve static files
+// Try to load the backend bundle
+try {
+  process.env.VERCEL = "1";
+  const distPath = path.resolve(__dirname, "..", "dist", "server", "index.js");
+  if (fs.existsSync(distPath)) {
+    const serverModule = require(distPath);
+    // serverModule should be the Express app returned by createApp()
+    if (serverModule && serverModule._router) {
+      app.use(serverModule);
+      console.log("[Vercel] Backend loaded successfully from dist/server/index.js");
+    }
+  }
+} catch (err) {
+  console.warn("[Vercel] Backend load warning:", err.message);
+}
+
+// Serve static frontend files
 const staticPath = path.resolve(__dirname, "..", "dist", "public");
-app.use(express.static(staticPath));
+if (fs.existsSync(staticPath)) {
+  app.use(express.static(staticPath));
+  console.log("[Vercel] Static files:", staticPath);
+}
 
 // SPA fallback
 app.get("*", (_req, res) => {
