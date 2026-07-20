@@ -247,38 +247,62 @@ export async function deletePasswordUser(userId: number): Promise<boolean> {
 export async function initializeDemoUsers() {
   try {
     const db = await getDb();
-    if (!db) throw new Error("Database not available");
+    if (!db) {
+      console.warn("[Password Auth] Database not available, skipping demo user init");
+      return { success: false };
+    }
 
     // 檢查 admin 使用者是否已存在
-    const adminResult = await db.select().from(users).where(eq(users.name, "admin")).limit(1);
+    let adminResult;
+    try {
+      adminResult = await db.select().from(users).where(eq(users.name, "admin")).limit(1);
+    } catch (e: any) {
+      console.warn("[Password Auth] Cannot query users table yet (schema migration pending):", e.message);
+      return { success: false };
+    }
     if (adminResult.length === 0) {
-      await registerPasswordUser(
-        "admin",
-        "admin123",
-        "管理員",
-        "admin@example.com",
-        "admin"
-      );
-      console.log("[Password Auth] Admin user initialized");
+      try {
+        await registerPasswordUser(
+          "admin",
+          "admin123",
+          "管理員",
+          "admin@example.com",
+          "admin"
+        );
+        console.log("[Password Auth] Admin user initialized");
+      } catch (e: any) {
+        console.warn("[Password Auth] Failed to create admin:", e.message);
+      }
     }
 
     // 檢查 user 使用者是否已存在
-    const userResult = await db.select().from(users).where(eq(users.name, "user")).limit(1);
+    let userResult;
+    try {
+      userResult = await db.select().from(users).where(eq(users.name, "user")).limit(1);
+    } catch (e: any) {
+      console.warn("[Password Auth] Cannot query users table:", e.message);
+      return { success: false };
+    }
     if (userResult.length === 0) {
-      await registerPasswordUser(
-        "user",
-        "user123",
-        "一般使用者",
-        "user@example.com",
-        "user"
-      );
-      console.log("[Password Auth] User user initialized");
+      try {
+        await registerPasswordUser(
+          "user",
+          "user123",
+          "一般使用者",
+          "user@example.com",
+          "user"
+        );
+        console.log("[Password Auth] User user initialized");
+      } catch (e: any) {
+        console.warn("[Password Auth] Failed to create user:", e.message);
+      }
     }
 
     console.log("[Password Auth] Demo users initialized successfully");
     return { success: true };
   } catch (error: any) {
-    console.error("Initialize demo users error:", error);
-    throw new Error(error.message || "初始化失敗");
+    // Non-fatal: log and continue
+    console.error("[Password Auth] Initialize demo users error (non-fatal):", error);
+    return { success: false };
   }
 }

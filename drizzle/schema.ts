@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, varchar, integer, timestamp, text, jsonb, date } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, varchar, integer, serial, timestamp, text, jsonb, date } from "drizzle-orm/pg-core";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export const parkingTypeEnum = pgEnum("parking_type", ["car", "motorcycle", "bicycle"]);
@@ -12,7 +12,7 @@ export const invitedStatusEnum = pgEnum("invited_status", ["pending", "accepted"
 
 // ─── 住戶表 ────────────────────────────────────────────────────────────────
 export const residents = pgTable("residents", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
 
   // 戶號
   unitNumber: varchar("unitNumber", { length: 32 }).notNull(),
@@ -77,7 +77,7 @@ export type InsertResident = typeof residents.$inferInsert;
 
 // ─── 同住人表（規範化） ────────────────────────────────────────────────────
 export const coResidents = pgTable("co_residents", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   residentId: integer("residentId").notNull(),
   name: varchar("name", { length: 64 }).notNull(),
   phone: varchar("phone", { length: 32 }),
@@ -90,7 +90,7 @@ export type InsertCoResident = typeof coResidents.$inferInsert;
 
 // ─── 車位表（規範化） ────────────────────────────────────────────────────
 export const parkings = pgTable("parkings", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   residentId: integer("residentId").notNull(),
   type: parkingTypeEnum("type").notNull(),
   number: varchar("number", { length: 32 }).notNull(),
@@ -104,7 +104,7 @@ export type InsertParking = typeof parkings.$inferInsert;
 
 // ─── 停車位牌照表（一個停車位可以有多個牌照） ────────────────────────────────
 export const parkingPlates = pgTable("parking_plates", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   parkingId: integer("parkingId").notNull(),
   plate: varchar("plate", { length: 32 }).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
@@ -116,7 +116,7 @@ export type InsertParkingPlate = typeof parkingPlates.$inferInsert;
 
 // ─── 緊急聯絡人表（規範化） ────────────────────────────────────────────────
 export const emergencyContacts = pgTable("emergency_contacts", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   residentId: integer("residentId").notNull(),
   name: varchar("name", { length: 64 }).notNull(),
   phone: varchar("phone", { length: 32 }),
@@ -131,7 +131,7 @@ export type InsertEmergencyContact = typeof emergencyContacts.$inferInsert;
 
 // ─── 報修統計表 ────────────────────────────────────────────────────────────────
 export const repairRequests = pgTable("repair_requests", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   repairDate: varchar("repairDate", { length: 32 }).notNull(),
   unitNumber: varchar("unitNumber", { length: 32 }).notNull(),
   description: text("description").notNull(),
@@ -147,7 +147,7 @@ export type InsertRepairRequest = typeof repairRequests.$inferInsert;
 
 // ─── 操作日誌表 ────────────────────────────────────────────────────────────────
 export const auditLogs = pgTable("audit_logs", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
   action: varchar("action", { length: 50 }).notNull(),
   entity: varchar("entity", { length: 50 }).notNull(),
@@ -161,7 +161,7 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 // ─── 帳密使用者表 ────────────────────────────────────────────────────────────────
 export const passwordUsers = pgTable("password_users", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   userId: integer("userId").notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
@@ -173,7 +173,7 @@ export type InsertPasswordUser = typeof passwordUsers.$inferInsert;
 
 // ─── 使用者表 ────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 64 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -190,7 +190,7 @@ export type InsertUser = typeof users.$inferInsert;
 
 // ─── 裝修申請表 ────────────────────────────────────────────────────────────────
 export const renovationApplications = pgTable("renovation_applications", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   unitNumber: varchar("unitNumber", { length: 32 }).notNull(),
   applicationDate: varchar("applicationDate", { length: 32 }).notNull(),
   constructionStartDate: varchar("constructionStartDate", { length: 32 }),
@@ -213,7 +213,7 @@ export type InsertRenovationApplication = typeof renovationApplications.$inferIn
 
 // 操作日誌表
 export const operationLogs = pgTable("operation_logs", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
   action: varchar("action", { length: 64 }).notNull(),
   module: varchar("module", { length: 64 }).notNull(),
@@ -233,7 +233,7 @@ export type InsertOperationLog = typeof operationLogs.$inferInsert;
 
 // 使用者登入時段表 - 追蹤用戶登入時間和設備
 export const userSessions = pgTable("user_sessions", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   userId: integer("userId").notNull(),
   sessionToken: varchar("sessionToken", { length: 255 }).notNull().unique(),
   ipAddress: varchar("ipAddress", { length: 45 }),
@@ -251,7 +251,7 @@ export type InsertUserSession = typeof userSessions.$inferInsert;
 
 // ─── 受邀人員表 ────────────────────────────────────────────────────────────────
 export const invitedUsers = pgTable("invited_users", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 64 }),
   role: varchar("role", { length: 32 }).default("user").notNull(),
@@ -270,7 +270,7 @@ export type InsertInvitedUser = typeof invitedUsers.$inferInsert;
 // 資源庫表
 // 資源文件夾表
 export const resourceFolders = pgTable("resource_folders", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
@@ -282,7 +282,7 @@ export type InsertResourceFolder = typeof resourceFolders.$inferInsert;
 
 // 資源檔案表
 export const resourceFiles = pgTable("resource_files", {
-  id: integer("id").serial().primaryKey(),
+  id: serial("id").primaryKey(),
   folderId: integer("folderId").notNull().references(() => resourceFolders.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
