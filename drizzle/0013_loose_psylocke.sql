@@ -1,0 +1,1 @@
+ALTER TABLE `repair_requests` MODIFY COLUMN `status` enum('pending','in_progress','completed','cancelled','resident_self_repair') DEFAULT 'pending';

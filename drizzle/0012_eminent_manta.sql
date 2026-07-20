@@ -1,0 +1,1 @@
+ALTER TABLE `renovation_applications` ADD `decorationDepositStatus` enum('notPaid','paid','refunded') DEFAULT 'notPaid';

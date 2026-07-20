@@ -1,0 +1,135 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Google Fonts ─────────────────────────────────────────────────────────── */
+/* Noto Serif TC for headings, Noto Sans TC for body */
+
+/* ─── Design Tokens ────────────────────────────────────────────────────────── */
+@theme inline {
+  /* Elegant palette: warm ivory background, deep charcoal text, gold accent */
+  --color-background: oklch(0.98 0.005 80);
+  --color-foreground: oklch(0.18 0.01 260);
+
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.18 0.01 260);
+
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.18 0.01 260);
+
+  /* Gold accent */
+  --color-primary: oklch(0.52 0.12 65);
+  --color-primary-foreground: oklch(0.99 0 0);
+
+  --color-secondary: oklch(0.94 0.01 80);
+  --color-secondary-foreground: oklch(0.25 0.01 260);
+
+  --color-muted: oklch(0.95 0.008 80);
+  --color-muted-foreground: oklch(0.52 0.01 260);
+
+  --color-accent: oklch(0.94 0.02 65);
+  --color-accent-foreground: oklch(0.35 0.08 65);
+
+  --color-destructive: oklch(0.55 0.2 25);
+  --color-destructive-foreground: oklch(0.99 0 0);
+
+  --color-border: oklch(0.88 0.01 80);
+  --color-input: oklch(0.88 0.01 80);
+  --color-ring: oklch(0.52 0.12 65);
+
+  /* Sidebar */
+  --color-sidebar: oklch(0.16 0.02 260);
+  --color-sidebar-foreground: oklch(0.88 0.01 80);
+  --color-sidebar-primary: oklch(0.72 0.12 65);
+  --color-sidebar-primary-foreground: oklch(0.16 0.02 260);
+  --color-sidebar-accent: oklch(0.24 0.02 260);
+  --color-sidebar-accent-foreground: oklch(0.92 0.01 80);
+  --color-sidebar-border: oklch(0.26 0.02 260);
+  --color-sidebar-ring: oklch(0.52 0.12 65);
+
+  /* Chart colors */
+  --color-chart-1: oklch(0.52 0.12 65);
+  --color-chart-2: oklch(0.62 0.1 200);
+  --color-chart-3: oklch(0.55 0.15 145);
+  --color-chart-4: oklch(0.65 0.12 300);
+  --color-chart-5: oklch(0.58 0.18 25);
+
+  --radius: 0.5rem;
+  --font-sans: "Noto Sans TC", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif TC", "Georgia", ui-serif, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ─── Base Styles ──────────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif tracking-tight;
+  }
+}
+
+/* ─── Custom utilities ─────────────────────────────────────────────────────── */
+@layer utilities {
+  .container {
+    @apply mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 1400px;
+  }
+
+  .flex {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Elegant card hover */
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-0.5;
+  }
+
+  /* Gold shimmer for headings */
+  .text-gold {
+    color: oklch(0.52 0.12 65);
+  }
+
+  /* Status badge colors */
+  .status-pending {
+    @apply bg-amber-50 text-amber-700 border-amber-200;
+  }
+  .status-in_progress {
+    @apply bg-blue-50 text-blue-700 border-blue-200;
+  }
+  .status-completed {
+    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+  }
+  .status-cancelled {
+    @apply bg-gray-50 text-gray-500 border-gray-200;
+  }
+  .status-resident_self_repair {
+    background-color: #FFA7D9;
+    color: #333;
+    border-color: #FFB8E1;
+  }
+
+  /* Print styles */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    .print-only {
+      display: block !important;
+    }
+    body {
+      background: white;
+      color: black;
+      font-size: 12pt;
+    }
+  }
+}
