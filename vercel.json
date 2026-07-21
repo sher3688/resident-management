@@ -4,15 +4,15 @@
   "installCommand": "pnpm install",
   "builds": [
     {
-      "src": "dist/api/index.js",
+      "src": "dist/functions/api/index.cjs",
       "use": "@vercel/node"
     },
     {
-      "src": "dist/public/**",
+      "src": "dist/static/**",
       "use": "@vercel/static"
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "dist/api/index.js" }
+    { "src": "/(.*)", "dest": "dist/functions/api/index.cjs" }
   ]
 }
