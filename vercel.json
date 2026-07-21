@@ -1,6 +1,18 @@
 {
   "version": 2,
   "buildCommand": "pnpm build",
-  "outputDirectory": "dist",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "builds": [
+    {
+      "src": "dist/functions/api/index.cjs",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "dist/functions/api/index.cjs" }
+  ]
 }
