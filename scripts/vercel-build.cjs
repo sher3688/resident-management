@@ -83,12 +83,16 @@ ${serverCode.replace(/module\.exports/g, "__module_exports")}
 // --- End Server Bundle ---
 
 // Get the Express app from the bundle
+// The server bundle exports createApp() function. We call it directly.
 var __app;
 try {
-  if (__module_exports && __module_exports._router) {
+  // Try to get createApp from the bundle exports
+  if (typeof __module_exports === 'function' || (__module_exports && __module_exports.handle)) {
     __app = __module_exports;
-  } else if (typeof __module_exports === 'function' || (__module_exports && __module_exports.handle)) {
+  } else if (__module_exports && __module_exports._router) {
     __app = __module_exports;
+  } else if (typeof createApp === 'function') {
+    __app = createApp();
   }
 } catch(e) {
   console.warn("[Vercel] Could not get app:", e.message);
