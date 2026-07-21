@@ -1,0 +1,26 @@
+[
+  {
+    "id": 2,
+    "openId": "password_user_1784634166843",
+    "name": "user",
+    "email": "user@example.com",
+    "loginMethod": "password",
+    "role": "user",
+    "isActive": 1,
+    "createdAt": "2026-07-21T11:42:46.843000+00:00",
+    "updatedAt": "2026-07-21T11:42:46.843000+00:00",
+    "lastSignedIn": "2026-07-21T11:42:46.843000+00:00"
+  },
+  {
+    "id": 1,
+    "openId": "password_admin_1784634165623",
+    "name": "admin",
+    "email": "admin@example.com",
+    "loginMethod": "password",
+    "role": "admin",
+    "isActive": 1,
+    "createdAt": "2026-07-21T11:42:45.623000+00:00",
+    "updatedAt": "2026-07-21T13:26:21.412000+00:00",
+    "lastSignedIn": "2026-07-21T13:26:21.193000+00:00"
+  }
+]

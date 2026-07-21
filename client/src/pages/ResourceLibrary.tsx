@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Folder, File, Plus, Edit2, Trash2, Download, Printer, Upload, X, FileDown } from "lucide-react";
+import { Folder, File, Plus, Edit2, Trash2, Download, Printer, Upload, X, FileDown, Eye } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ResourceLibrary() {
@@ -33,6 +33,7 @@ export default function ResourceLibrary() {
   const [uploadFileOpen, setUploadFileOpen] = useState(false);
   const [deleteFolderId, setDeleteFolderId] = useState<number | null>(null);
   const [deleteFileId, setDeleteFileId] = useState<number | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ name: string; url: string; type: string } | null>(null);
 
   const [folderForm, setFolderForm] = useState({ id: 0, name: "", description: "" });
   const [fileForm, setFileForm] = useState({ id: 0, folderId: 0, name: "", file: null as File | null });
@@ -356,6 +357,15 @@ export default function ResourceLibrary() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 text-blue-600 hover:text-blue-700"
+                            onClick={() => setPreviewFile({ name: file.name, url: file.fileUrl, type: file.fileType })}
+                            title="線上預覽"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8"
                             onClick={() => window.open(file.fileUrl, "_blank")}
                             title="下載"
@@ -583,6 +593,62 @@ export default function ResourceLibrary() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 線上預覽 Dialog */}
+      <Dialog open={!!previewFile} onOpenChange={(open) => !open && setPreviewFile(null)}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[90vh] max-h-[90vh] p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg">{previewFile?.name}</DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setPreviewFile(null)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 h-full overflow-hidden">
+            {previewFile?.type === 'pdf' ? (
+              <iframe
+                src={`${previewFile.url}#toolbar=1&navpanes=0&scrollbar=1`}
+                className="w-full h-full border-0"
+                title={previewFile.name}
+              />
+            ) : (
+              <iframe
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(previewFile?.url || '')}&embedded=true`}
+                className="w-full h-full border-0"
+                title={previewFile.name}
+              />
+            )}
+          </div>
+          <div className="px-6 py-3 border-t flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (previewFile) {
+                  const printWindow = window.open(previewFile.url, "_blank");
+                  if (printWindow) {
+                    printWindow.addEventListener("load", () => printWindow.print());
+                  }
+                }
+              }}
+            >
+              <Printer className="w-4 h-4 mr-2" />列印
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => previewFile && window.open(previewFile.url, "_blank")}
+            >
+              <Download className="w-4 h-4 mr-2" />下載
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

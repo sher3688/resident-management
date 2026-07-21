@@ -1,0 +1,3 @@
+id	openId	name	email	loginMethod	role	isActive	createdAt	updatedAt	lastSignedIn
+1	password_admin_1784609316378	admin	admin@example.com	password	admin	1	2026-07-21T04:48:36.378000	2026-07-21T04:48:36.378000	2026-07-21T04:48:36.378000
+2	password_user_1784609316515	user	user@example.com	password	user	1	2026-07-21T04:48:36.515000	2026-07-21T04:48:36.515000	2026-07-21T04:48:36.515000
