@@ -1,18 +1,7 @@
-// Step 3: Call createApp()
+// Handler for Vercel serverless - imports the server bundle and creates the app
 import { createApp } from "./server.mjs";
 
-let app;
-try {
-  app = createApp();
-} catch(e) {
-  // Fallback if createApp fails
-  import express from "express";
-  app = express();
-  app.use(express.json());
-}
-
-app.use(function(_req, res) {
-  res.status(404).json({ error: "API endpoint not found" });
-});
+// Create the Express app (server.mjs's createApp handles all routes)
+const app = createApp();
 
 export default app;

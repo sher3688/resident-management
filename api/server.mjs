@@ -2734,18 +2734,19 @@ import express from "express";
 import fs2 from "fs";
 import path2 from "path";
 function serveStatic(app) {
+  const isVercel2 = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  if (isVercel2) {
+    console.log("[Server] Skipping serveStatic in Vercel serverless environment");
+    return;
+  }
   let distPath;
-  const vercelPath = path2.resolve(process.env.LAMBDA_TASK_ROOT || __dirname, "public");
   const localPath = path2.resolve(process.cwd(), "dist", "public");
-  if (fs2.existsSync(vercelPath)) {
-    distPath = vercelPath;
-    console.log(`[Server] Using static files from: ${distPath}`);
-  } else if (fs2.existsSync(localPath)) {
+  if (fs2.existsSync(localPath)) {
     distPath = localPath;
     console.log(`[Server] Using static files from: ${distPath}`);
   } else {
-    distPath = vercelPath;
-    console.warn(`[Server] Static files not found at: ${vercelPath} or ${localPath}`);
+    console.warn(`[Server] Static files not found at: ${localPath}`);
+    return;
   }
   app.use(express.static(distPath));
   app.use("*", (_req, res) => {

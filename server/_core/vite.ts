@@ -3,25 +3,26 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
+  // Skip static file serving in Vercel serverless environment
+  // Vercel handles static files via outputDirectory and rewrites
+  const isVercel = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  if (isVercel) {
+    console.log("[Server] Skipping serveStatic in Vercel serverless environment");
+    return;
+  }
+
   // Determine the correct path for static files
   let distPath: string;
 
-  // Vercel serverless: dist/index.js is deployed, public/ is sibling directory
-  // In Vercel, the function root is the output directory
-  const vercelPath = path.resolve(process.env.LAMBDA_TASK_ROOT || __dirname, "public");
-  
   // Local development: dist/public from project root
   const localPath = path.resolve(process.cwd(), "dist", "public");
 
-  if (fs.existsSync(vercelPath)) {
-    distPath = vercelPath;
-    console.log(`[Server] Using static files from: ${distPath}`);
-  } else if (fs.existsSync(localPath)) {
+  if (fs.existsSync(localPath)) {
     distPath = localPath;
     console.log(`[Server] Using static files from: ${distPath}`);
   } else {
-    distPath = vercelPath;
-    console.warn(`[Server] Static files not found at: ${vercelPath} or ${localPath}`);
+    console.warn(`[Server] Static files not found at: ${localPath}`);
+    return;
   }
 
   app.use(express.static(distPath));
