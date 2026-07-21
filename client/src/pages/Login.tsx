@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { Building2, AlertCircle } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Login() {
@@ -131,14 +131,7 @@ function LoginForm() {
               {loading ? "登入中..." : "登入"}
             </Button>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-700">
-                <p className="font-semibold mb-2">預設帳號：</p>
-                <p className="text-xs">帳號：admin</p>
-                <p className="text-xs">密碼：admin123</p>
-              </div>
-            </div>
+
           </form>
         </CardContent>
       </Card>
