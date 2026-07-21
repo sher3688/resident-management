@@ -1,4 +1,4 @@
-// Test 1: Just return JSON - no imports from server.mjs
+// Minimal handler - same as test.js
 export default function handler(req, res) {
-  res.status(200).json({ status: "ok", path: req.url });
+  res.status(200).json({ status: "ok", path: req.url, via: "handler" });
 }
