@@ -8,6 +8,6 @@
     { "source": "/__manus__/(.*)", "destination": "/public/__manus__/$1" },
     { "source": "/index.html", "destination": "/public/index.html" },
     { "source": "/pdf.worker.min.mjs", "destination": "/public/pdf.worker.min.mjs" },
-    { "source": "/(.*)", "destination": "/public/index.html" }
+    { "source": "/((?!api/|server/).*)", "destination": "/public/index.html" }
   ]
 }
