@@ -38,6 +38,7 @@ import { residentsWithAuditRouter } from "./residents-routes";
 import { accountManagementRouter } from "./account-management-routes";
 import { renovationApplicationsRouter } from "./renovation-applications-routes";
 import { resourceLibraryRouter } from "./resource-library-routes";
+import { regulationSettingsRouter } from "./regulation-settings-routes";
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 const residentInput = z.object({
@@ -461,6 +462,7 @@ export const appRouter = router({
   auditLog: auditLogRouter,
   accountManagement: accountManagementRouter,
   invitedUsers: invitedUsersRouter,
+  regulationSettings: regulationSettingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

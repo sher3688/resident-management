@@ -906,7 +906,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 
 // server/routers.ts
-import { z as z10 } from "zod";
+import { z as z11 } from "zod";
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -926,8 +926,8 @@ function getSessionCookieOptions(req) {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "lax",
-    secure: true
+    sameSite: "none",
+    secure: isSecureRequest(req)
   };
 }
 
@@ -2393,54 +2393,99 @@ var resourceLibraryRouter = router({
   })
 });
 
-// server/routers.ts
-var residentInput2 = z10.object({
-  unitNumber: z10.string().min(1, "\u6236\u865F\u70BA\u5FC5\u586B"),
-  ownerName: z10.string().min(1, "\u5340\u6B0A\u4EBA\u59D3\u540D\u70BA\u5FC5\u586B"),
-  ownerPhone: z10.string().optional().nullable(),
-  coResident1Name: z10.string().optional().nullable(),
-  coResident1Phone: z10.string().optional().nullable(),
-  coResident2Name: z10.string().optional().nullable(),
-  coResident2Phone: z10.string().optional().nullable(),
-  coResident3Name: z10.string().optional().nullable(),
-  coResident3Phone: z10.string().optional().nullable(),
-  coResident4Name: z10.string().optional().nullable(),
-  coResident4Phone: z10.string().optional().nullable(),
-  carParkingNumber: z10.string().optional().nullable(),
-  carPlateNumber: z10.string().optional().nullable(),
-  motorcycleParkingNumber: z10.string().optional().nullable(),
-  motorcyclePlateNumber: z10.string().optional().nullable(),
-  bicycleParkingNumber: z10.string().optional().nullable(),
-  address: z10.string().optional().nullable(),
-  emergencyContactName: z10.string().optional().nullable(),
-  emergencyContactPhone: z10.string().optional().nullable(),
-  emergencyContactRelation: z10.string().optional().nullable(),
-  emergencyContactAddress: z10.string().optional().nullable(),
-  emergencyContact2Name: z10.string().optional().nullable(),
-  emergencyContact2Phone: z10.string().optional().nullable(),
-  emergencyContact2Relation: z10.string().optional().nullable(),
-  emergencyContact2Address: z10.string().optional().nullable(),
-  squareMeters: z10.string().optional().nullable(),
-  waterMeterNumber: z10.string().optional().nullable(),
-  electricityMeterNumber: z10.string().optional().nullable(),
-  moveInDate: z10.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u5165\u4F4F\u65E5\u671F\u683C\u5F0F\u61C9\u70BA YYYY-MM-DD").optional().nullable(),
-  notes: z10.string().optional().nullable()
+// server/regulation-settings-routes.ts
+import { z as z10 } from "zod";
+init_db();
+function escapeSql(str) {
+  return str.replace(/'/g, "''");
+}
+var regulationSettingsRouter = router({
+  // 取得目前規約 PDF URL（任何登入者都可讀）
+  getRegulation: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const result = await db.execute(
+      `SELECT key, value, description, updated_at FROM system_settings WHERE key = 'regulation_pdf_url'`
+    );
+    const rows = result.rows || [];
+    if (rows.length === 0) {
+      return { pdfUrl: null, description: null, updatedAt: null };
+    }
+    const row = rows[0];
+    return {
+      pdfUrl: row.value,
+      description: row.description,
+      updatedAt: row.updated_at
+    };
+  }),
+  // 更新規約 PDF URL（需要 admin 權限）
+  updateRegulation: adminProcedure.input(
+    z10.object({
+      pdfUrl: z10.string().min(1, "PDF URL \u4E0D\u80FD\u70BA\u7A7A"),
+      description: z10.string().optional()
+    })
+  ).mutation(async ({ input }) => {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+    const desc3 = escapeSql(input.description || "\u4F4F\u6236\u7BA1\u7406\u898F\u7D04 PDF \u7DB2\u5740");
+    const url = escapeSql(input.pdfUrl);
+    await db.execute(
+      `INSERT INTO system_settings (key, value, description)
+         VALUES ('regulation_pdf_url', '${url}', '${desc3}')
+         ON CONFLICT (key) DO UPDATE SET value = '${url}', updated_at = NOW()`
+    );
+    return { success: true };
+  })
 });
-var repairRequestInput2 = z10.object({
-  repairDate: z10.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u5831\u4FEE\u65E5\u671F\u683C\u5F0F\u61C9\u70BA YYYY-MM-DD"),
-  unitNumber: z10.string().min(1, "\u6236\u865F\u70BA\u5FC5\u586B"),
-  reporterName: z10.string().optional().nullable(),
-  description: z10.string().min(1, "\u72C0\u6CC1\u63CF\u8FF0\u70BA\u5FC5\u586B"),
-  location: z10.string().optional().nullable(),
-  status: z10.enum(["pending", "in_progress", "completed", "cancelled"]).default("pending"),
-  handlerNotes: z10.string().optional().nullable(),
-  completedDate: z10.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u5B8C\u6210\u65E5\u671F\u683C\u5F0F\u61C9\u70BA YYYY-MM-DD").optional().nullable()
+
+// server/routers.ts
+var residentInput2 = z11.object({
+  unitNumber: z11.string().min(1, "\u6236\u865F\u70BA\u5FC5\u586B"),
+  ownerName: z11.string().min(1, "\u5340\u6B0A\u4EBA\u59D3\u540D\u70BA\u5FC5\u586B"),
+  ownerPhone: z11.string().optional().nullable(),
+  coResident1Name: z11.string().optional().nullable(),
+  coResident1Phone: z11.string().optional().nullable(),
+  coResident2Name: z11.string().optional().nullable(),
+  coResident2Phone: z11.string().optional().nullable(),
+  coResident3Name: z11.string().optional().nullable(),
+  coResident3Phone: z11.string().optional().nullable(),
+  coResident4Name: z11.string().optional().nullable(),
+  coResident4Phone: z11.string().optional().nullable(),
+  carParkingNumber: z11.string().optional().nullable(),
+  carPlateNumber: z11.string().optional().nullable(),
+  motorcycleParkingNumber: z11.string().optional().nullable(),
+  motorcyclePlateNumber: z11.string().optional().nullable(),
+  bicycleParkingNumber: z11.string().optional().nullable(),
+  address: z11.string().optional().nullable(),
+  emergencyContactName: z11.string().optional().nullable(),
+  emergencyContactPhone: z11.string().optional().nullable(),
+  emergencyContactRelation: z11.string().optional().nullable(),
+  emergencyContactAddress: z11.string().optional().nullable(),
+  emergencyContact2Name: z11.string().optional().nullable(),
+  emergencyContact2Phone: z11.string().optional().nullable(),
+  emergencyContact2Relation: z11.string().optional().nullable(),
+  emergencyContact2Address: z11.string().optional().nullable(),
+  squareMeters: z11.string().optional().nullable(),
+  waterMeterNumber: z11.string().optional().nullable(),
+  electricityMeterNumber: z11.string().optional().nullable(),
+  moveInDate: z11.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u5165\u4F4F\u65E5\u671F\u683C\u5F0F\u61C9\u70BA YYYY-MM-DD").optional().nullable(),
+  notes: z11.string().optional().nullable()
+});
+var repairRequestInput2 = z11.object({
+  repairDate: z11.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u5831\u4FEE\u65E5\u671F\u683C\u5F0F\u61C9\u70BA YYYY-MM-DD"),
+  unitNumber: z11.string().min(1, "\u6236\u865F\u70BA\u5FC5\u586B"),
+  reporterName: z11.string().optional().nullable(),
+  description: z11.string().min(1, "\u72C0\u6CC1\u63CF\u8FF0\u70BA\u5FC5\u586B"),
+  location: z11.string().optional().nullable(),
+  status: z11.enum(["pending", "in_progress", "completed", "cancelled"]).default("pending"),
+  handlerNotes: z11.string().optional().nullable(),
+  completedDate: z11.string().regex(/^\d{4}-\d{2}-\d{2}$/, "\u5B8C\u6210\u65E5\u671F\u683C\u5F0F\u61C9\u70BA YYYY-MM-DD").optional().nullable()
 });
 var residentsRouter = router({
-  list: publicProcedure.input(z10.object({ search: z10.string().optional() }).optional()).query(async ({ input }) => {
+  list: publicProcedure.input(z11.object({ search: z11.string().optional() }).optional()).query(async ({ input }) => {
     return listResidents(input?.search);
   }),
-  getById: publicProcedure.input(z10.object({ id: z10.number() })).query(async ({ input }) => {
+  getById: publicProcedure.input(z11.object({ id: z11.number() })).query(async ({ input }) => {
     return getResidentById(input.id);
   }),
   create: publicProcedure.input(residentInput2).mutation(async ({ input }) => {
@@ -2451,7 +2496,7 @@ var residentsRouter = router({
     await createResident(data);
     return { success: true };
   }),
-  update: publicProcedure.input(z10.object({ id: z10.number(), data: residentInput2.partial() })).mutation(async ({ input }) => {
+  update: publicProcedure.input(z11.object({ id: z11.number(), data: residentInput2.partial() })).mutation(async ({ input }) => {
     const data = {
       ...input.data,
       moveInDate: input.data.moveInDate !== void 0 ? input.data.moveInDate || null : void 0
@@ -2459,7 +2504,7 @@ var residentsRouter = router({
     await updateResident(input.id, data);
     return { success: true };
   }),
-  delete: publicProcedure.input(z10.object({ id: z10.number() })).mutation(async ({ input }) => {
+  delete: publicProcedure.input(z11.object({ id: z11.number() })).mutation(async ({ input }) => {
     await deleteResident(input.id);
     return { success: true };
   }),
@@ -2469,7 +2514,7 @@ var residentsRouter = router({
     await db.delete(residents);
     return { success: true };
   }),
-  validateUnitNumber: publicProcedure.input(z10.object({ unitNumber: z10.string(), excludeId: z10.number().optional() })).query(async ({ input }) => {
+  validateUnitNumber: publicProcedure.input(z11.object({ unitNumber: z11.string(), excludeId: z11.number().optional() })).query(async ({ input }) => {
     const formatRegex = /^[\u4e00-\u9fa5a-zA-Z0-9\-]+$/;
     if (!formatRegex.test(input.unitNumber)) {
       return { valid: false, error: "\u6236\u865F\u683C\u5F0F\u4E0D\u7B26\uFF08\u53EA\u5141\u8A31\u4E2D\u6587\u3001\u82F1\u6587\u3001\u6578\u5B57\u3001\u9023\u5B57\u865F\uFF09" };
@@ -2483,7 +2528,7 @@ var residentsRouter = router({
     }
     return { valid: true };
   }),
-  importBatch: publicProcedure.input(z10.object({ residents: z10.array(residentInput2) })).mutation(async ({ input }) => {
+  importBatch: publicProcedure.input(z11.object({ residents: z11.array(residentInput2) })).mutation(async ({ input }) => {
     const batchInput = input.residents;
     let successCount = 0;
     let errorCount = 0;
@@ -2514,24 +2559,24 @@ var residentsRouter = router({
   })
 });
 var repairRequestsRouter = router({
-  list: publicProcedure.input(z10.object({
-    status: z10.string().optional(),
-    unitNumber: z10.string().optional()
+  list: publicProcedure.input(z11.object({
+    status: z11.string().optional(),
+    unitNumber: z11.string().optional()
   }).optional()).query(async ({ input }) => {
     return listRepairRequests(input);
   }),
-  getById: publicProcedure.input(z10.object({ id: z10.number() })).query(async ({ input }) => {
+  getById: publicProcedure.input(z11.object({ id: z11.number() })).query(async ({ input }) => {
     return getRepairRequestById(input.id);
   }),
   create: publicProcedure.input(repairRequestInput2).mutation(async ({ input }) => {
     await createRepairRequest(input);
     return { success: true };
   }),
-  update: publicProcedure.input(z10.object({ id: z10.number(), data: repairRequestInput2.partial() })).mutation(async ({ input }) => {
+  update: publicProcedure.input(z11.object({ id: z11.number(), data: repairRequestInput2.partial() })).mutation(async ({ input }) => {
     await updateRepairRequest(input.id, input.data);
     return { success: true };
   }),
-  delete: publicProcedure.input(z10.object({ id: z10.number() })).mutation(async ({ input }) => {
+  delete: publicProcedure.input(z11.object({ id: z11.number() })).mutation(async ({ input }) => {
     await deleteRepairRequest(input.id);
     return { success: true };
   })
@@ -2540,7 +2585,7 @@ var adminRouter = router({
   listUsers: adminProcedure.query(async () => {
     return listAllUsers();
   }),
-  updateUserRole: adminProcedure.input(z10.object({ openId: z10.string(), role: z10.enum(["admin", "user"]) })).mutation(async ({ input }) => {
+  updateUserRole: adminProcedure.input(z11.object({ openId: z11.string(), role: z11.enum(["admin", "user"]) })).mutation(async ({ input }) => {
     await updateUserRole(input.openId, input.role);
     return { success: true };
   }),
@@ -2548,11 +2593,11 @@ var adminRouter = router({
     const data = await backupAllData();
     return data;
   }),
-  restoreResidents: adminProcedure.input(z10.object({ data: z10.array(z10.any()) })).mutation(async ({ input }) => {
+  restoreResidents: adminProcedure.input(z11.object({ data: z11.array(z11.any()) })).mutation(async ({ input }) => {
     const result = await restoreResidents(input.data);
     return result;
   }),
-  restoreRepairRequests: adminProcedure.input(z10.object({ data: z10.array(z10.any()) })).mutation(async ({ input }) => {
+  restoreRepairRequests: adminProcedure.input(z11.object({ data: z11.array(z11.any()) })).mutation(async ({ input }) => {
     const result = await restoreRepairRequests(input.data);
     return result;
   }),
@@ -2560,7 +2605,7 @@ var adminRouter = router({
   getUsers: adminProcedure.query(async () => {
     return listAllUsers();
   }),
-  getOperationLogs: adminProcedure.input(z10.object({ limit: z10.number().default(50) })).query(async ({ input }) => {
+  getOperationLogs: adminProcedure.input(z11.object({ limit: z11.number().default(50) })).query(async ({ input }) => {
     const db = await getDb();
     if (!db) return [];
     const { operationLogs: operationLogs2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
@@ -2576,7 +2621,7 @@ var adminRouter = router({
     const sessions = await db.select().from(userSessions2).where(eq5(userSessions2.isActive, 1));
     return sessions;
   }),
-  forceLogoutUser: adminProcedure.input(z10.object({ sessionId: z10.number() })).mutation(async ({ input }) => {
+  forceLogoutUser: adminProcedure.input(z11.object({ sessionId: z11.number() })).mutation(async ({ input }) => {
     const { logoutUserSession: logoutUserSession2 } = await Promise.resolve().then(() => (init_db(), db_exports));
     await logoutUserSession2(input.sessionId);
     return { success: true };
@@ -2602,11 +2647,11 @@ var invitedUsersRouter = router({
    * 添加受邀人員
    */
   add: adminProcedure.input(
-    z10.object({
-      email: z10.string().email("\u90F5\u7BB1\u683C\u5F0F\u4E0D\u6B63\u78BA"),
-      name: z10.string().optional(),
-      role: z10.enum(["admin", "user"]).default("user"),
-      notes: z10.string().optional()
+    z11.object({
+      email: z11.string().email("\u90F5\u7BB1\u683C\u5F0F\u4E0D\u6B63\u78BA"),
+      name: z11.string().optional(),
+      role: z11.enum(["admin", "user"]).default("user"),
+      notes: z11.string().optional()
     })
   ).mutation(async ({ input, ctx }) => {
     try {
@@ -2633,7 +2678,7 @@ var invitedUsersRouter = router({
   /**
    * 刪除受邀人員
    */
-  delete: adminProcedure.input(z10.object({ id: z10.number() })).mutation(async ({ input, ctx }) => {
+  delete: adminProcedure.input(z11.object({ id: z11.number() })).mutation(async ({ input, ctx }) => {
     try {
       const invited = await getInvitedUserById(input.id);
       if (!invited) {
@@ -2656,7 +2701,7 @@ var invitedUsersRouter = router({
   /**
    * 検查郵箱是否被邀請
    */
-  checkEmail: publicProcedure.input(z10.object({ email: z10.string().email() })).query(async ({ input }) => {
+  checkEmail: publicProcedure.input(z11.object({ email: z11.string().email() })).query(async ({ input }) => {
     const isInvited = await isEmailInvited(input.email);
     return { isInvited };
   }),
@@ -2664,9 +2709,9 @@ var invitedUsersRouter = router({
    * 更新受邀人員狀態
    */
   updateStatus: adminProcedure.input(
-    z10.object({
-      id: z10.number(),
-      status: z10.enum(["pending", "accepted", "rejected"])
+    z11.object({
+      id: z11.number(),
+      status: z11.enum(["pending", "accepted", "rejected"])
     })
   ).mutation(async ({ input, ctx }) => {
     try {
@@ -2712,7 +2757,8 @@ var appRouter = router({
   passwordUsers: passwordUserManagementRouter,
   auditLog: auditLogRouter,
   accountManagement: accountManagementRouter,
-  invitedUsers: invitedUsersRouter
+  invitedUsers: invitedUsersRouter,
+  regulationSettings: regulationSettingsRouter
 });
 
 // server/_core/context.ts
@@ -2720,21 +2766,19 @@ init_db();
 async function createContext(opts) {
   let user = null;
   try {
-    // First try Bearer token (from Authorization header)
-    const authHeader = opts.req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      const session = await sdk.verifySession(token);
-      if (session) {
-        const dbUser = await getUserById(session.userId);
-        if (dbUser) {
-          user = dbUser;
+    user = await sdk.authenticateRequest(opts.req);
+    if (!user) {
+      const authHeader = opts.req.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const token = authHeader.slice(7);
+        const session = await sdk.verifySession(token);
+        if (session) {
+          const dbUser = await getUserById(session.userId);
+          if (dbUser) {
+            user = dbUser;
+          }
         }
       }
-    }
-    // Fallback to cookie-based authentication
-    if (!user) {
-      user = await sdk.authenticateRequest(opts.req);
     }
   } catch (error) {
     user = null;
@@ -2789,78 +2833,63 @@ residentsExportRouter.get("/export", async (req, res) => {
     const { residents: residentsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const { sql: sql2 } = await import("drizzle-orm");
     const rows = await db.select().from(residentsTable).orderBy(residentsTable.unitNumber);
-    const format = (req.query.format || "json").toString();
-    
-    if (format === "csv") {
-      // TSV CSV format (backward compatible)
-      const headers = [
-        "unitNumber","ownerName","ownerPhone","address",
-        "coResident1Name","coResident1Phone","coResident2Name","coResident2Phone",
-        "coResident3Name","coResident3Phone","coResident4Name","coResident4Phone",
-        "carParkingNumber","carPlateNumber","motorcycleParkingNumber","motorcyclePlateNumber",
-        "bicycleParkingNumber","squareMeters","waterMeterNumber","electricityMeterNumber",
-        "moveInDate","emergencyContactName","emergencyContactPhone","emergencyContactRelation",
-        "emergencyContact2Name","emergencyContact2Phone","emergencyContact2Relation","emergencyContact2Address",
-        "notes"
-      ];
-      const csv = [
-        headers.join("\t"),
-        ...rows.map((row) => headers.map((header) => {
+    const headers = [
+      "id",
+      "unitNumber",
+      "ownerName",
+      "ownerPhone",
+      "address",
+      "coResident1Name",
+      "coResident1Phone",
+      "coResident2Name",
+      "coResident2Phone",
+      "coResident3Name",
+      "coResident3Phone",
+      "coResident4Name",
+      "coResident4Phone",
+      "carParkingNumber",
+      "carPlateNumber",
+      "motorcycleParkingNumber",
+      "motorcyclePlateNumber",
+      "bicycleParkingNumber",
+      "squareMeters",
+      "waterMeterNumber",
+      "electricityMeterNumber",
+      "moveInDate",
+      "emergencyContactName",
+      "emergencyContactPhone",
+      "emergencyContactRelation",
+      "emergencyContact2Name",
+      "emergencyContact2Phone",
+      "emergencyContact2Relation",
+      "notes",
+      "createdAt",
+      "updatedAt"
+    ];
+    const csv = [
+      headers.join("	"),
+      // 使用 Tab 作為分隔符以支援中文
+      ...rows.map(
+        (row) => headers.map((header) => {
           const value = row[header];
           if (value === null || value === void 0) return "";
-          if (value instanceof Date) return value.toISOString().split("T")[0];
+          if (value instanceof Date) {
+            return value.toISOString().split("T")[0];
+          }
           if (typeof value === "string") {
-            return value.includes("\t") || value.includes("\n") || value.includes('"') ? `"${value.replace(/"/g, '""')}"` : value;
+            return value.includes("	") || value.includes("\n") || value.includes('"') ? `"${value.replace(/"/g, '""')}"` : value;
           }
           return String(value);
-        }).join("\t"))
-      ].join("\n");
-      res.setHeader("Content-Type", "text/tab-separated-values; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="residents_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`);
-      res.setHeader("Content-Length", Buffer.byteLength(csv, "utf-8"));
-      res.send(csv);
-    } else {
-      // JSON format (compatible with import batch)
-      const exportData = rows.map((row) => {
-        const clean = {
-          unitNumber: row.unitNumber,
-          ownerName: row.ownerName,
-          ownerPhone: row.ownerPhone || null,
-          address: row.address || null,
-          coResident1Name: row.coResident1Name || null,
-          coResident1Phone: row.coResident1Phone || null,
-          coResident2Name: row.coResident2Name || null,
-          coResident2Phone: row.coResident2Phone || null,
-          coResident3Name: row.coResident3Name || null,
-          coResident3Phone: row.coResident3Phone || null,
-          coResident4Name: row.coResident4Name || null,
-          coResident4Phone: row.coResident4Phone || null,
-          carParkingNumber: row.carParkingNumber || null,
-          carPlateNumber: row.carPlateNumber || null,
-          motorcycleParkingNumber: row.motorcycleParkingNumber || null,
-          motorcyclePlateNumber: row.motorcyclePlateNumber || null,
-          bicycleParkingNumber: row.bicycleParkingNumber || null,
-          squareMeters: row.squareMeters || null,
-          waterMeterNumber: row.waterMeterNumber || null,
-          electricityMeterNumber: row.electricityMeterNumber || null,
-          moveInDate: row.moveInDate || null,
-          emergencyContactName: row.emergencyContactName || null,
-          emergencyContactPhone: row.emergencyContactPhone || null,
-          emergencyContactRelation: row.emergencyContactRelation || null,
-          emergencyContact2Name: row.emergencyContact2Name || null,
-          emergencyContact2Phone: row.emergencyContact2Phone || null,
-          emergencyContact2Relation: row.emergencyContact2Relation || null,
-          emergencyContact2Address: row.emergencyContact2Address || null,
-          notes: row.notes || null,
-        };
-        return clean;
-      });
-      const jsonStr = JSON.stringify(exportData, null, 2);
-      res.setHeader("Content-Type", "application/json; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="residents_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json"`);
-      res.setHeader("Content-Length", Buffer.byteLength(jsonStr, "utf-8"));
-      res.send(jsonStr);
-    }
+        }).join("	")
+      )
+    ].join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="residents_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`
+    );
+    res.setHeader("Content-Length", Buffer.byteLength(csv, "utf-8"));
+    res.send(csv);
   } catch (error) {
     console.error("Export error:", error);
     res.status(500).json({ error: "Failed to export residents data" });
