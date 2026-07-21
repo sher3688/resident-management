@@ -1,6 +1,6 @@
-// Step 1: Import express only (minimal dependency)
-import express from "express";
+// Step 2: Import from server.mjs
+import { createApp } from "./server.mjs";
 
 export default function handler(req, res) {
-  res.status(200).json({ status: "ok", path: req.url, express: typeof express });
+  res.status(200).json({ status: "ok", path: req.url, createApp: typeof createApp });
 }
