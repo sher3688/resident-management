@@ -99,51 +99,66 @@ export default function PrintFormsPage() {
   const selectedRepair = selectedRepairId !== "all"
     ? repairs.find((r) => String(r.id) === selectedRepairId)
     : null;
-  function handleExportExcel() {
-    const data = residents.map((r) => ({
-      "戶號": r.unitNumber,
-      "區權人": r.ownerName,
-      "電話": r.ownerPhone ?? "",
-      "同住人": [r.coResident1Name, r.coResident2Name, r.coResident3Name, r.coResident4Name]
-        .filter(Boolean)
-        .join("、"),
-      "同住人電話": [r.coResident1Phone, r.coResident2Phone, r.coResident3Phone, r.coResident4Phone]
-        .filter(Boolean)
-        .join("、"),
-      "汽車車位": r.carParkingNumber ?? "",
-      "機車車位": r.motorcycleParkingNumber ?? "",
-      "自行車位": r.bicycleParkingNumber ?? "",
-      "緊急連絡人": [r.emergencyContactName, r.emergencyContact2Name]
-        .filter(Boolean)
-        .map((name, idx) => {
-          const relation = idx === 0 ? r.emergencyContactRelation : r.emergencyContact2Relation;
-          const phone = idx === 0 ? r.emergencyContactPhone : r.emergencyContact2Phone;
-          return `${name}${relation ? `（${relation}）` : ""} ${phone ?? ""}`;
-        })
-        .join("、"),
-      "附註": r.notes ?? "",
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
+  function handleExportExcel(formId?: string) {
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "住戶資料");
+    const dateStr = new Date().toISOString().split('T')[0];
     
-    // 設置列寬
-    const colWidths = [
-      { wch: 10 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 15 },
-      { wch: 20 },
-    ];
-    worksheet["!cols"] = colWidths;
+    // 住戶資料總表
+    if (!formId || formId === 'resident-list' || formId === 'resident-detail' || formId === 'resident-blank') {
+      const residentData = residents.map((r: any) => ({
+        "戶號": r.unitNumber,
+        "區權人": r.ownerName,
+        "電話": r.ownerPhone ?? "",
+        "地址": r.address ?? "",
+        "同住人1": r.coResident1Name ?? "",
+        "同住人1電話": r.coResident1Phone ?? "",
+        "同住人2": r.coResident2Name ?? "",
+        "同住人2電話": r.coResident2Phone ?? "",
+        "同住人3": r.coResident3Name ?? "",
+        "同住人3電話": r.coResident3Phone ?? "",
+        "同住人4": r.coResident4Name ?? "",
+        "同住人4電話": r.coResident4Phone ?? "",
+        "汽車車位": r.carParkingNumber ?? "",
+        "汽車車牌": r.carPlateNumber ?? "",
+        "機車車位": r.motorcycleParkingNumber ?? "",
+        "機車車牌": r.motorcyclePlateNumber ?? "",
+        "自行車位": r.bicycleParkingNumber ?? "",
+        "平方公尺": r.squareMeters ?? "",
+        "水表號": r.waterMeterNumber ?? "",
+        "電表號": r.electricityMeterNumber ?? "",
+        "入住日期": r.moveInDate ?? "",
+        "緊急連絡人": r.emergencyContactName ?? "",
+        "緊急連絡人電話": r.emergencyContactPhone ?? "",
+        "緊急連絡人關係": r.emergencyContactRelation ?? "",
+        "緊急連絡人2": r.emergencyContact2Name ?? "",
+        "緊急連絡人2電話": r.emergencyContact2Phone ?? "",
+        "緊急連絡人2關係": r.emergencyContact2Relation ?? "",
+        "備註": r.notes ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(residentData);
+      XLSX.utils.book_append_sheet(workbook, ws, "住戶資料");
+    }
     
-    const fileName = `住戶資料總表_${new Date().toISOString().split('T')[0]}.xlsx`;
+    // 報修統計表
+    if (!formId || formId === 'repair-list' || formId === 'repair-single' || formId === 'repair-blank') {
+      const repairData = repairs.map((r: any) => ({
+        "報修編號": r.id,
+        "戶號": r.unitNumber,
+        "報修日期": r.repairDate ?? "",
+        "報修內容": r.description ?? "",
+        "狀態": STATUS_LABELS[r.status] ?? r.status,
+        "完工日期": r.completionDate ?? "",
+        "備註": r.notes ?? "",
+        "建立時間": r.createdAt ?? "",
+        "更新時間": r.updatedAt ?? "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(repairData);
+      XLSX.utils.book_append_sheet(workbook, ws, "報修統計");
+    }
+    
+    const fileName = formId 
+      ? `${FORM_TYPES.find(f => f.id === formId)?.title ?? '表單'}_${dateStr}.xlsx`
+      : `住戶資料總表_${dateStr}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   }
 
@@ -686,17 +701,15 @@ export default function PrintFormsPage() {
                 <Eye className="w-3.5 h-3.5" />
                 預覽
               </Button>
-              {form.id === "resident-list" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs flex-1"
-                  onClick={() => handleExportExcel()}
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  匯出 Excel
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs flex-1"
+                onClick={() => handleExportExcel(form.id)}
+              >
+                <Download className="w-3.5 h-3.5" />
+                匯出 Excel
+              </Button>
             </div>
           </div>
         ))}

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Folder, File, Plus, Edit2, Trash2, Download, Printer, Upload, X } from "lucide-react";
+import { Folder, File, Plus, Edit2, Trash2, Download, Printer, Upload, X, FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ResourceLibrary() {
@@ -221,6 +221,31 @@ export default function ResourceLibrary() {
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
 
+  const handleExportResourceMetadata = () => {
+    // 匯出所有文件夾和檔案的 metadata
+    const allData = folders.map((folder: any) => {
+      const folderFiles = files.filter((f: any) => f.folderId === folder.id);
+      return {
+        folderName: folder.name,
+        folderDescription: folder.description || '',
+        files: folderFiles.map((f: any) => ({
+          name: f.name,
+          fileUrl: f.fileUrl,
+          fileSize: f.fileSize,
+          fileType: f.fileType,
+          createdAt: f.createdAt
+        }))
+      };
+    });
+    const jsonStr = JSON.stringify(allData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `資源庫_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    toast.success('已匯出資源庫資料');
+  };
+
   return (
     <div className="space-y-6">
       {/* 標題 */}
@@ -229,10 +254,16 @@ export default function ResourceLibrary() {
           <h1 className="text-3xl font-bold text-foreground">資源庫</h1>
           <p className="text-sm text-muted-foreground mt-1">管理社區相關文件和資源</p>
         </div>
-        <Button onClick={() => setCreateFolderOpen(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          新增文件夾
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleExportResourceMetadata} variant="outline" className="gap-2">
+            <FileDown className="w-4 h-4" />
+            匯出 JSON
+          </Button>
+          <Button onClick={() => setCreateFolderOpen(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            新增文件夾
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
