@@ -59,26 +59,52 @@ export default function ImportResidentsPage() {
     },
   });
 
+  function parseCSV(text: string): any[] {
+    // Parse TSV (tab-separated) format
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return [];
+    const headers = lines[0].split('\t').map(h => h.trim());
+    const results = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split('\t').map(v => v.trim());
+      const obj: any = {};
+      headers.forEach((h, idx) => {
+        let val = values[idx] || '';
+        // Remove surrounding quotes if present
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.slice(1, -1).replace(/""/g, '"');
+        }
+        if (val === '' || val === 'null') val = null;
+        obj[h] = val;
+      });
+      results.push(obj);
+    }
+    return results;
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
 
-    // 檢查檔案類型
+    // 檢查檔案類型 - 支援 JSON 和 CSV
     const validTypes = [
       "application/json",
       "text/plain",
+      "text/tab-separated-values",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ];
-    if (!validTypes.includes(f.type) && !f.name.endsWith(".json")) {
-      toast.error("請選擇 JSON 或 Excel 檔案");
+    const isJson = f.type === "application/json" || f.name.endsWith(".json");
+    const isCSV = f.type === "text/plain" || f.type === "text/tab-separated-values" || f.name.endsWith(".csv") || f.name.endsWith(".tsv");
+    if (!validTypes.includes(f.type) && !isJson && !isCSV) {
+      toast.error("請選擇 JSON 或 CSV 檔案");
       return;
     }
 
     setFile(f);
     setResult(null);
 
-    // 如果是 JSON，直接讀取
-    if (f.type === "application/json" || f.name.endsWith(".json")) {
+    if (isJson) {
+      // 如果是 JSON，直接讀取
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
@@ -94,8 +120,27 @@ export default function ImportResidentsPage() {
         }
       };
       reader.readAsText(f);
+    } else if (isCSV) {
+      // 如果是 CSV，解析 TSV 格式
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = parseCSV(event.target?.result as string);
+          if (data.length === 0) {
+            toast.error("CSV 檔案沒有有效資料");
+            return;
+          }
+          // Remove id, createdAt, updatedAt if present (not needed for import)
+          const cleaned = data.map(({ id, createdAt, updatedAt, ...rest }) => rest);
+          setJsonData(cleaned);
+          toast.success(`已讀取 ${cleaned.length} 筆資料`);
+        } catch (err) {
+          toast.error("CSV 格式錯誤：" + (err instanceof Error ? err.message : "未知錯誤"));
+        }
+      };
+      reader.readAsText(f, 'utf-8');
     } else {
-      toast.info("Excel 檔案請先轉換為 JSON 格式後上傳");
+      toast.info("Excel 檔案請先轉換為 JSON 或 CSV 格式後上傳");
     }
   }
 
@@ -161,7 +206,7 @@ export default function ImportResidentsPage() {
           批次匯入住戶資料
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          上傳 JSON 檔案以批次新增住戶資料到系統
+          上傳 JSON 或 CSV 檔案以批次新增住戶資料到系統
         </p>
       </div>
 
@@ -169,7 +214,7 @@ export default function ImportResidentsPage() {
       <Card className="bg-muted/50 border-border p-5">
         <h3 className="font-medium text-sm mb-3">使用說明</h3>
         <ul className="text-xs text-muted-foreground space-y-2 list-disc list-inside">
-          <li>準備 JSON 格式的住戶資料檔案（可參考下方範例）</li>
+          <li>準備 JSON 或 CSV 格式的住戶資料檔案（可參考下方範例）</li>
           <li>每筆資料必須包含：戶號、區權人姓名</li>
           <li>其他欄位（電話、同住人、車位等）為選填</li>
           <li>系統會逐筆驗證並匯入，失敗的記錄會顯示錯誤訊息</li>
@@ -190,11 +235,11 @@ export default function ImportResidentsPage() {
             <input
               id="file-input"
               type="file"
-              accept=".json"
+              accept=".json,.csv,.tsv"
               onChange={handleFileChange}
               className="hidden"
             />
-            <p className="text-xs text-muted-foreground mt-1">或拖放 JSON 檔案到此</p>
+            <p className="text-xs text-muted-foreground mt-1">或拖放 JSON / CSV 檔案到此</p>
           </div>
         </div>
       </div>

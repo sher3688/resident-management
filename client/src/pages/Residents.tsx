@@ -408,18 +408,35 @@ export default function Residents() {
           <Button
             onClick={() => {
               const link = document.createElement('a');
-              link.href = '/api/residents/export';
-              link.download = `residents_${new Date().toISOString().split('T')[0]}.csv`;
+              link.href = '/api/residents/export?format=json';
+              link.download = `residents_${new Date().toISOString().split('T')[0]}.json`;
               document.body.appendChild(link);
               link.click();
               document.body.removeChild(link);
-              toast.success('住戶資料已開始下載');
+              toast.success('住戶資料已開始下載（JSON 格式，可直接匯入）');
             }}
             variant="outline"
             className="gap-2 shadow-sm"
           >
             <Download className="w-4 h-4" />
-            匯出資料
+            匯出 JSON
+          </Button>
+          <Button
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = '/api/residents/export?format=csv';
+              link.download = `residents_${new Date().toISOString().split('T')[0]}.csv`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              toast.success('住戶資料已開始下載（CSV 格式）');
+            }}
+            variant="ghost"
+            size="sm"
+            className="text-xs gap-1"
+          >
+            <Download className="w-3 h-3" />
+            CSV
           </Button>
           <Button
             onClick={() => setImportDialogOpen(true)}
