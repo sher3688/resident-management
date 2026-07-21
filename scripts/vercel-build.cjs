@@ -171,4 +171,13 @@ const fnEntries = fs.readdirSync(functionsDir);
 console.log("  dist/functions/api/ →", fnEntries.join(", "));
 console.log("  index.html exists:", hasIndexHtml);
 
+// 7. Also copy the function to project root api/ directory for Vercel auto-detection
+const rootApiDir = path.resolve(rootDir, "api");
+if (!fs.existsSync(rootApiDir)) {
+  fs.mkdirSync(rootApiDir, { recursive: true });
+}
+const fnContent = fs.readFileSync(path.resolve(functionsDir, "index.cjs"), "utf8");
+fs.writeFileSync(path.resolve(rootApiDir, "index.js"), fnContent);
+console.log("[Vercel Build] Copied function to api/index.js in project root");
+
 console.log("\n[Vercel Build] Done!");
