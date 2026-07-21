@@ -82,19 +82,19 @@ async function startServer() {
   });
 }
 
-// Vercel serverless: always initialize demo users and export the app
-// For local development: start server directly
-const isVercel = !!process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
-
-// Initialize demo users
+// Always initialize demo users
 initializeDemoUsers().catch((err) => {
   console.warn("[Server] Demo users init:", err.message);
 });
 
-// For Vercel: export the Express app as the default export
+// For Vercel serverless: export the Express app via module.exports
 // For local: start the server
+const isVercel = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+
 if (isVercel) {
-  // The api/index.js wrapper will import this and use createApp()
+  // Export the Express app for serverless handler
+  // @ts-ignore - module.exports is needed for CJS serverless handler
+  module.exports = createApp();
 } else {
   startServer().catch((error) => {
     console.error("[Server] Failed to start:", error);
