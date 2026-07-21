@@ -7,6 +7,7 @@
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/__manus__/(.*)", "destination": "/__manus__/$1" },
     { "source": "/pdf.worker.min.mjs", "destination": "/pdf.worker.min.mjs" },
+    { "source": "/api/(.*)", "destination": "/api/handler" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
