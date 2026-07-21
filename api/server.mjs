@@ -926,8 +926,8 @@ function getSessionCookieOptions(req) {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req)
+    sameSite: "lax",
+    secure: true
   };
 }
 
@@ -2720,19 +2720,21 @@ init_db();
 async function createContext(opts) {
   let user = null;
   try {
-    user = await sdk.authenticateRequest(opts.req);
-    if (!user) {
-      const authHeader = opts.req.headers.authorization;
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.slice(7);
-        const session = await sdk.verifySession(token);
-        if (session) {
-          const dbUser = await getUserById(session.userId);
-          if (dbUser) {
-            user = dbUser;
-          }
+    // First try Bearer token (from Authorization header)
+    const authHeader = opts.req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const session = await sdk.verifySession(token);
+      if (session) {
+        const dbUser = await getUserById(session.userId);
+        if (dbUser) {
+          user = dbUser;
         }
       }
+    }
+    // Fallback to cookie-based authentication
+    if (!user) {
+      user = await sdk.authenticateRequest(opts.req);
     }
   } catch (error) {
     user = null;
@@ -2787,63 +2789,78 @@ residentsExportRouter.get("/export", async (req, res) => {
     const { residents: residentsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
     const { sql: sql2 } = await import("drizzle-orm");
     const rows = await db.select().from(residentsTable).orderBy(residentsTable.unitNumber);
-    const headers = [
-      "id",
-      "unitNumber",
-      "ownerName",
-      "ownerPhone",
-      "address",
-      "coResident1Name",
-      "coResident1Phone",
-      "coResident2Name",
-      "coResident2Phone",
-      "coResident3Name",
-      "coResident3Phone",
-      "coResident4Name",
-      "coResident4Phone",
-      "carParkingNumber",
-      "carPlateNumber",
-      "motorcycleParkingNumber",
-      "motorcyclePlateNumber",
-      "bicycleParkingNumber",
-      "squareMeters",
-      "waterMeterNumber",
-      "electricityMeterNumber",
-      "moveInDate",
-      "emergencyContactName",
-      "emergencyContactPhone",
-      "emergencyContactRelation",
-      "emergencyContact2Name",
-      "emergencyContact2Phone",
-      "emergencyContact2Relation",
-      "notes",
-      "createdAt",
-      "updatedAt"
-    ];
-    const csv = [
-      headers.join("	"),
-      // 使用 Tab 作為分隔符以支援中文
-      ...rows.map(
-        (row) => headers.map((header) => {
+    const format = (req.query.format || "json").toString();
+    
+    if (format === "csv") {
+      // TSV CSV format (backward compatible)
+      const headers = [
+        "unitNumber","ownerName","ownerPhone","address",
+        "coResident1Name","coResident1Phone","coResident2Name","coResident2Phone",
+        "coResident3Name","coResident3Phone","coResident4Name","coResident4Phone",
+        "carParkingNumber","carPlateNumber","motorcycleParkingNumber","motorcyclePlateNumber",
+        "bicycleParkingNumber","squareMeters","waterMeterNumber","electricityMeterNumber",
+        "moveInDate","emergencyContactName","emergencyContactPhone","emergencyContactRelation",
+        "emergencyContact2Name","emergencyContact2Phone","emergencyContact2Relation","emergencyContact2Address",
+        "notes"
+      ];
+      const csv = [
+        headers.join("\t"),
+        ...rows.map((row) => headers.map((header) => {
           const value = row[header];
           if (value === null || value === void 0) return "";
-          if (value instanceof Date) {
-            return value.toISOString().split("T")[0];
-          }
+          if (value instanceof Date) return value.toISOString().split("T")[0];
           if (typeof value === "string") {
-            return value.includes("	") || value.includes("\n") || value.includes('"') ? `"${value.replace(/"/g, '""')}"` : value;
+            return value.includes("\t") || value.includes("\n") || value.includes('"') ? `"${value.replace(/"/g, '""')}"` : value;
           }
           return String(value);
-        }).join("	")
-      )
-    ].join("\n");
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="residents_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`
-    );
-    res.setHeader("Content-Length", Buffer.byteLength(csv, "utf-8"));
-    res.send(csv);
+        }).join("\t"))
+      ].join("\n");
+      res.setHeader("Content-Type", "text/tab-separated-values; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="residents_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.csv"`);
+      res.setHeader("Content-Length", Buffer.byteLength(csv, "utf-8"));
+      res.send(csv);
+    } else {
+      // JSON format (compatible with import batch)
+      const exportData = rows.map((row) => {
+        const clean = {
+          unitNumber: row.unitNumber,
+          ownerName: row.ownerName,
+          ownerPhone: row.ownerPhone || null,
+          address: row.address || null,
+          coResident1Name: row.coResident1Name || null,
+          coResident1Phone: row.coResident1Phone || null,
+          coResident2Name: row.coResident2Name || null,
+          coResident2Phone: row.coResident2Phone || null,
+          coResident3Name: row.coResident3Name || null,
+          coResident3Phone: row.coResident3Phone || null,
+          coResident4Name: row.coResident4Name || null,
+          coResident4Phone: row.coResident4Phone || null,
+          carParkingNumber: row.carParkingNumber || null,
+          carPlateNumber: row.carPlateNumber || null,
+          motorcycleParkingNumber: row.motorcycleParkingNumber || null,
+          motorcyclePlateNumber: row.motorcyclePlateNumber || null,
+          bicycleParkingNumber: row.bicycleParkingNumber || null,
+          squareMeters: row.squareMeters || null,
+          waterMeterNumber: row.waterMeterNumber || null,
+          electricityMeterNumber: row.electricityMeterNumber || null,
+          moveInDate: row.moveInDate || null,
+          emergencyContactName: row.emergencyContactName || null,
+          emergencyContactPhone: row.emergencyContactPhone || null,
+          emergencyContactRelation: row.emergencyContactRelation || null,
+          emergencyContact2Name: row.emergencyContact2Name || null,
+          emergencyContact2Phone: row.emergencyContact2Phone || null,
+          emergencyContact2Relation: row.emergencyContact2Relation || null,
+          emergencyContact2Address: row.emergencyContact2Address || null,
+          notes: row.notes || null,
+        };
+        return clean;
+      });
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="residents_${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}.json"`);
+      res.setHeader("Content-Length", Buffer.byteLength(jsonStr, "utf-8"));
+      res.send(jsonStr);
+    }
   } catch (error) {
     console.error("Export error:", error);
     res.status(500).json({ error: "Failed to export residents data" });
