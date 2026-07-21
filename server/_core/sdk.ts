@@ -89,7 +89,7 @@ export const sdk = {
     }
 
     // Look up user by openId from JWT payload
-    const user = await db.getUserByOpenId(session.openId);
+    const user = await db.getUserById(session.userId);
     if (!user) {
       return null;
     }

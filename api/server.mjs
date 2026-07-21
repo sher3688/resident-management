@@ -316,6 +316,7 @@ __export(db_exports, {
   getResidentById: () => getResidentById,
   getResourceFileById: () => getResourceFileById,
   getResourceFolderById: () => getResourceFolderById,
+  getUserById: () => getUserById,
   getUserByOpenId: () => getUserByOpenId,
   hasActiveSession: () => hasActiveSession,
   isEmailInvited: () => isEmailInvited,
@@ -408,6 +409,15 @@ async function getUserByOpenId(openId) {
     return void 0;
   }
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return result.length > 0 ? result[0] : void 0;
+}
+async function getUserById(userId) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return void 0;
+  }
+  const result = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   return result.length > 0 ? result[0] : void 0;
 }
 async function listResidents(search) {
@@ -1133,7 +1143,7 @@ var sdk = {
     if (!session) {
       return null;
     }
-    const user = await getUserByOpenId(session.openId);
+    const user = await getUserById(session.userId);
     if (!user) {
       return null;
     }
@@ -2717,7 +2727,7 @@ async function createContext(opts) {
         const token = authHeader.slice(7);
         const session = await sdk.verifySession(token);
         if (session) {
-          const dbUser = await getUserByOpenId(session.openId);
+          const dbUser = await getUserById(session.userId);
           if (dbUser) {
             user = dbUser;
           }
