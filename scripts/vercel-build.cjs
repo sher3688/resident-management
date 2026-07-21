@@ -82,8 +82,8 @@ app.use(function(_req, res) {
 export default app;
 `;
 
-fs.writeFileSync(path.resolve(rootApiDir, "index.js"), apiCode);
-console.log("[Vercel Build] Generated api/index.js (thin ESM wrapper)");
+fs.writeFileSync(path.resolve(rootApiDir, "handler.js"), apiCode);
+console.log("[Vercel Build] Generated api/handler.js (thin ESM wrapper)");
 
 // 4. Clean up
 const oldDirs = ["public", "server", "functions"];
@@ -98,7 +98,7 @@ for (const dir of oldDirs) {
 // 5. Summary
 console.log("\n[Vercel Build] Output structure:");
 console.log("  dist/static/ →", fs.readdirSync(staticDir).join(", "));
-console.log("  api/index.js →", fs.existsSync(path.resolve(rootApiDir, "index.js")) ? "YES" : "NO");
+console.log("  api/handler.js →", fs.existsSync(path.resolve(rootApiDir, "handler.js")) ? "YES" : "NO");
 console.log("  api/server.mjs →", fs.existsSync(serverDest) ? "YES" : "NO");
 
 console.log("\n[Vercel Build] Done!");
