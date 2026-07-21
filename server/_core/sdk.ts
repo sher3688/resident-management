@@ -45,7 +45,7 @@ export const sdk = {
    */
   async verifySession(
     token: string | undefined | null
-  ): Promise<{ userId: number; name: string } | null> {
+  ): Promise<{ userId: number; name: string; openId: string } | null> {
     if (!token) {
       console.warn("[Auth] Missing session token");
       return null;
@@ -87,8 +87,8 @@ export const sdk = {
       return null;
     }
 
-    // Look up user by ID (stored in password_users table)
-    const user = await db.getUserByOpenId(String(session.userId));
+    // Look up user by openId from JWT payload
+    const user = await db.getUserByOpenId(session.openId);
     if (!user) {
       return null;
     }

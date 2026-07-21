@@ -14,6 +14,7 @@ export interface PasswordUser {
   email: string;
   role: "admin" | "user";
   isActive: boolean;
+  openId: string;
 }
 
 /**
@@ -55,6 +56,7 @@ export async function authenticatePasswordUser(
       name: user.name,
       email: user.email,
       role: user.role || 'user',
+      openId: user.openId,
       isActive: true,
     };
   } catch (error) {
@@ -153,6 +155,7 @@ export async function getPasswordUser(userId: number): Promise<PasswordUser | nu
       name: user.name,
       email: user.email,
       role: user.role || 'user',
+      openId: user.openId,
       isActive: true,
     };
   } catch (error) {
@@ -176,6 +179,7 @@ export async function getAllPasswordUsers(): Promise<PasswordUser[]> {
       name: user.name,
       email: user.email,
       role: user.role || 'user',
+      openId: user.openId,
       isActive: true,
     }));
   } catch (error) {

@@ -26,7 +26,7 @@ export async function createContext(
         const session = await sdk.verifySession(token);
         if (session) {
           // Look up user by ID
-          const dbUser = await db.getUserByOpenId(String(session.userId));
+          const dbUser = await db.getUserByOpenId(session.openId);
           if (dbUser) {
             user = dbUser;
           }

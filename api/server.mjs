@@ -1132,7 +1132,7 @@ var sdk = {
     if (!session) {
       return null;
     }
-    const user = await getUserByOpenId(String(session.userId));
+    const user = await getUserByOpenId(session.openId);
     if (!user) {
       return null;
     }
@@ -1179,6 +1179,7 @@ async function authenticatePasswordUser(username, password) {
       name: user.name,
       email: user.email,
       role: user.role || "user",
+      openId: user.openId,
       isActive: true
     };
   } catch (error) {
@@ -1245,6 +1246,7 @@ async function getPasswordUser(userId) {
       name: user.name,
       email: user.email,
       role: user.role || "user",
+      openId: user.openId,
       isActive: true
     };
   } catch (error) {
@@ -1263,6 +1265,7 @@ async function getAllPasswordUsers() {
       name: user.name,
       email: user.email,
       role: user.role || "user",
+      openId: user.openId,
       isActive: true
     }));
   } catch (error) {
@@ -1376,6 +1379,7 @@ var passwordAuthRouter = router({
       throw new Error("\u4F7F\u7528\u8005\u540D\u7A31\u6216\u5BC6\u78BC\u932F\u8AA4");
     }
     const token = await sdk.createSessionToken(user.id, {
+      openId: user.openId,
       name: user.name,
       expiresInMs: ONE_YEAR_MS
     });
@@ -2712,7 +2716,7 @@ async function createContext(opts) {
         const token = authHeader.slice(7);
         const session = await sdk.verifySession(token);
         if (session) {
-          const dbUser = await getUserByOpenId(String(session.userId));
+          const dbUser = await getUserByOpenId(session.openId);
           if (dbUser) {
             user = dbUser;
           }
@@ -2958,8 +2962,27 @@ async function findAvailablePort(startPort = 3e3) {
   }
   throw new Error(`No available port found starting from ${startPort}`);
 }
+var demoUsersInitialized = false;
+async function ensureDemoUsers() {
+  if (demoUsersInitialized) return;
+  demoUsersInitialized = true;
+  try {
+    await initializeDemoUsers();
+    console.log("[Server] Demo users initialized (lazy)");
+  } catch (error) {
+    console.error("[Server] Failed to initialize demo users:", error);
+  }
+}
 function createApp() {
   const app = express3();
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    app.use(async (_req, _res, next) => {
+      if (!demoUsersInitialized) {
+        await ensureDemoUsers();
+      }
+      next();
+    });
+  }
   app.use(express3.json({ limit: "50mb" }));
   app.use(express3.urlencoded({ limit: "50mb", extended: true }));
   app.use("/api/residents", residentsExportRouter);

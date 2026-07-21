@@ -30,8 +30,29 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 // Create the Express app and configure all routes
+let demoUsersInitialized = false;
+async function ensureDemoUsers() {
+  if (demoUsersInitialized) return;
+  demoUsersInitialized = true;
+  try {
+    await initializeDemoUsers();
+    console.log("[Server] Demo users initialized (lazy)");
+  } catch (error) {
+    console.error("[Server] Failed to initialize demo users:", error);
+  }
+}
+
 export function createApp(): express.Express {
   const app = express();
+  // On Vercel, lazily initialize demo users on first request
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    app.use(async (_req, _res, next) => {
+      if (!demoUsersInitialized) {
+        await ensureDemoUsers();
+      }
+      next();
+    });
+  }
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));

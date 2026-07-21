@@ -35,6 +35,7 @@ export const passwordAuthRouter = router({
 
       // Create JWT token
       const token = await sdk.createSessionToken(user.id, {
+        openId: user.openId,
         name: user.name,
         expiresInMs: ONE_YEAR_MS,
       });
