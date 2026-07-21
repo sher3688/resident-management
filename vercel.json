@@ -1,13 +1,18 @@
 {
   "version": 2,
   "buildCommand": "pnpm build",
-  "outputDirectory": "dist",
   "installCommand": "pnpm install",
-  "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/public/assets/$1" },
-    { "source": "/__manus__/(.*)", "destination": "/public/__manus__/$1" },
-    { "source": "/index.html", "destination": "/public/index.html" },
-    { "source": "/pdf.worker.min.mjs", "destination": "/public/pdf.worker.min.mjs" },
-    { "source": "/((?!api/|server/).*)", "destination": "/public/index.html" }
+  "builds": [
+    {
+      "src": "dist/api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "dist/public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "dist/api/index.js" }
   ]
 }
