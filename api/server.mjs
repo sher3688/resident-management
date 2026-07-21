@@ -926,8 +926,8 @@ function getSessionCookieOptions(req) {
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req)
+    sameSite: "lax",
+    secure: true
   };
 }
 
@@ -2720,19 +2720,21 @@ init_db();
 async function createContext(opts) {
   let user = null;
   try {
-    user = await sdk.authenticateRequest(opts.req);
-    if (!user) {
-      const authHeader = opts.req.headers.authorization;
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.slice(7);
-        const session = await sdk.verifySession(token);
-        if (session) {
-          const dbUser = await getUserById(session.userId);
-          if (dbUser) {
-            user = dbUser;
-          }
+    // First try Bearer token (from Authorization header)
+    const authHeader = opts.req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const session = await sdk.verifySession(token);
+      if (session) {
+        const dbUser = await getUserById(session.userId);
+        if (dbUser) {
+          user = dbUser;
         }
       }
+    }
+    // Fallback to cookie-based authentication
+    if (!user) {
+      user = await sdk.authenticateRequest(opts.req);
     }
   } catch (error) {
     user = null;
