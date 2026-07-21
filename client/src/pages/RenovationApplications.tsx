@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { Printer, Plus, Edit, Trash2 } from "lucide-react";
+import { Printer, Plus, Edit, Trash2, FileDown } from "lucide-react";
+import { useState } from "react";
 
 // 施工類型常數
 const CONSTRUCTION_TYPE_RENOVATION = '施工裝潢';
@@ -93,6 +94,34 @@ export default function RenovationApplicationsPage() {
       toast.error(error.message || "刪除失敗");
     },
   });
+
+  const handleExportCSV = () => {
+    const headers = [
+      'id', 'unitNumber', 'applicationDate', 'constructionStartDate', 'constructionEndDate',
+      'constructionContent', 'consentLetterPasted', 'applicantName', 'applicantPhone',
+      'registeredBy', 'status', 'decorationDeposit', 'decorationDepositStatus', 'notes',
+      'createdAt', 'updatedAt'
+    ];
+    const csvRows = [
+      headers.join('\t'),
+      ...filteredApplications.map(app => headers.map(h => {
+        const val = app[h];
+        if (val === null || val === undefined) return '';
+        if (val instanceof Date) return val.toISOString().split('T')[0];
+        if (typeof val === 'string') {
+          return val.includes('\t') || val.includes('\n') || val.includes('"') ? `"${val.replace(/"/g, '""')}"` : val;
+        }
+        return String(val);
+      }).join('\t'))
+    ];
+    const csv = csvRows.join('\n');
+    const blob = new Blob([csv], { type: 'text/tab-separated-values;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `裝修申請_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success('已匯出裝修申請資料');
+  };
 
   const resetForm = () => {
     setFormData({
@@ -380,6 +409,10 @@ export default function RenovationApplicationsPage() {
 
       {/* 操作按鈕 */}
       <div className="flex gap-2">
+        <Button onClick={handleExportCSV} variant="outline" className="gap-2">
+          <FileDown className="w-4 h-4" />
+          匯出 CSV
+        </Button>
         <Button onClick={handlePrint} variant="outline" className="gap-2">
           <Printer className="w-4 h-4" />
           列印
