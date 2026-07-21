@@ -1,6 +1,18 @@
-// Step 2: Import from server.mjs
+// Step 3: Call createApp()
 import { createApp } from "./server.mjs";
 
-export default function handler(req, res) {
-  res.status(200).json({ status: "ok", path: req.url, createApp: typeof createApp });
+let app;
+try {
+  app = createApp();
+} catch(e) {
+  // Fallback if createApp fails
+  import express from "express";
+  app = express();
+  app.use(express.json());
 }
+
+app.use(function(_req, res) {
+  res.status(404).json({ error: "API endpoint not found" });
+});
+
+export default app;
