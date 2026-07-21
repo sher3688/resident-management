@@ -32,6 +32,7 @@ export const sdk = {
     return new SignJWT({
       userId,
       name: options.name || "",
+      openId: options.openId || "",
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setIssuer(JWT_ISSUER)

@@ -1091,7 +1091,8 @@ var sdk = {
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1e3);
     return new SignJWT({
       userId,
-      name: options.name || ""
+      name: options.name || "",
+      openId: options.openId || ""
     }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setIssuer(JWT_ISSUER).setIssuedAt().setExpirationTime(expirationSeconds).sign(JWT_SECRET);
   },
   /**
