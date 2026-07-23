@@ -1,7 +1,12 @@
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -340,7 +345,7 @@ __export(db_exports, {
   updateUserRole: () => updateUserRole,
   upsertUser: () => upsertUser
 });
-import { and, eq, like, or, desc } from "drizzle-orm";
+import { and as and2, eq, like, or, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 async function getPool() {
@@ -565,7 +570,7 @@ async function listRepairRequests(filters) {
     conditions.push(eq(repairRequests.status, filters.status));
   }
   if (conditions.length > 0) {
-    return await db.select().from(repairRequests).where(and(...conditions)).orderBy(repairRequests.createdAt);
+    return await db.select().from(repairRequests).where(and2(...conditions)).orderBy(repairRequests.createdAt);
   }
   return await db.select().from(repairRequests).orderBy(repairRequests.createdAt);
 }
@@ -714,7 +719,7 @@ async function getActiveSessionsByUserId(userId) {
     return [];
   }
   try {
-    const sessions = await db.select().from(userSessions).where(and(eq(userSessions.userId, userId), eq(userSessions.isActive, 1)));
+    const sessions = await db.select().from(userSessions).where(and2(eq(userSessions.userId, userId), eq(userSessions.isActive, 1)));
     return sessions;
   } catch (error) {
     console.error("[Database] Failed to get sessions:", error);
@@ -804,7 +809,7 @@ async function listRenovationApplications(filters) {
     conditions.push(eq(renovationApplications.status, filters.status));
   }
   if (conditions.length > 0) {
-    return await db.select().from(renovationApplications).where(and(...conditions)).orderBy(renovationApplications.createdAt);
+    return await db.select().from(renovationApplications).where(and2(...conditions)).orderBy(renovationApplications.createdAt);
   }
   return await db.select().from(renovationApplications).orderBy(renovationApplications.createdAt);
 }
@@ -1079,6 +1084,303 @@ var systemRouter = router({
 init_db();
 init_db();
 init_schema();
+
+// server/sync-handler.ts
+init_db();
+var SYNC_API_KEY = process.env.SYNC_API_KEY || "meishu-qa-sync-key-2026";
+var SYNC_TARGET_URL = process.env.SYNC_TARGET_URL || "";
+async function syncToRemote(operation, table, data, keyField, keyValue) {
+  if (!SYNC_TARGET_URL) {
+    console.log("[SYNC] \u672A\u8A2D\u5B9A SYNC_TARGET_URL\uFF0C\u8DF3\u904E\u540C\u6B65");
+    return;
+  }
+  try {
+    const response = await fetch(`${SYNC_TARGET_URL}/api/sync`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Sync-Source": "resident-management",
+        "X-Sync-Api-Key": SYNC_API_KEY
+      },
+      body: JSON.stringify({
+        operation,
+        table,
+        data,
+        keyField,
+        keyValue,
+        sourceSystem: "resident-management",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }),
+      signal: AbortSignal.timeout(1e4)
+      // 10秒超時
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`[SYNC] \u540C\u6B65\u5931\u6557: ${table} ${operation} - ${response.status}: ${errorText}`);
+    } else {
+      console.log(`[SYNC] \u540C\u6B65\u6210\u529F: ${table} ${operation} (keyField=${keyField}, keyValue=${keyValue})`);
+    }
+  } catch (error) {
+    console.warn(`[SYNC] \u540C\u6B65\u8ACB\u6C42\u7570\u5E38: ${table} ${operation} - ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+async function handleSyncRequest(req) {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, message: "Database not available" };
+  }
+  try {
+    switch (req.table) {
+      case "residents":
+        return await syncResident(db, req);
+      case "emergency_contacts":
+        return await syncEmergencyContact(db, req);
+      case "repair_requests":
+        return await syncRepairRequest(db, req);
+      case "renovation_applications":
+        return await syncRenovationApplication(db, req);
+      case "resource_folders":
+        return await syncResourceFolder(db, req);
+      case "resource_files":
+        return await syncResourceFile(db, req);
+      case "invited_users":
+        return await syncInvitedUser(db, req);
+      case "parkings":
+        return await syncParking(db, req);
+      case "parking_plates":
+        return await syncParkingPlate(db, req);
+      default:
+        return { success: false, message: `Unknown table: ${req.table}` };
+    }
+  } catch (error) {
+    console.error(`[SYNC] \u8655\u7406\u540C\u6B65\u8ACB\u6C42\u5931\u6557: ${req.table} ${req.operation}`, error);
+    return { success: false, message: `Internal error: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+async function syncResident(db, req) {
+  const { residents: residents2, coResidents: coResidents3, emergencyContacts: emergencyContacts2, parkings: parkings2, parkingPlates: parkingPlates2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5, and: and3 } = await import("drizzle-orm");
+  const unitNumber = req.data.unitNumber;
+  if (!unitNumber) {
+    return { success: false, message: "Missing unitNumber" };
+  }
+  const existing = await db.select().from(residents2).where(eq5(residents2.unitNumber, unitNumber)).limit(1);
+  const existingRecord = existing[0] || null;
+  const newData = req.data;
+  if (existingRecord && existingRecord.updatedAt && newData.updatedAt) {
+    const localTime = new Date(existingRecord.updatedAt).getTime();
+    const remoteTime = new Date(newData.updatedAt).getTime();
+    if (localTime >= remoteTime) {
+      console.log(`[SYNC] \u4F4F\u6236 ${unitNumber} \u672C\u5730\u8CC7\u6599\u8F03\u65B0\uFF0C\u8DF3\u904E\u540C\u6B65`);
+      return { success: true, message: "Skipped - local data is newer", action: "skipped" };
+    }
+  }
+  const residentData = { ...newData };
+  delete residentData.emergencyContacts;
+  delete residentData.coResidents;
+  delete residentData.parkings;
+  delete residentData.id;
+  if (req.operation === "delete") {
+    if (existingRecord) {
+      await db.delete(coResidents3).where(eq5(coResidents3.residentId, existingRecord.id));
+      await db.delete(parkingPlates2).where(eq5(parkingPlates2.parkingId, 0));
+      await db.delete(emergencyContacts2).where(eq5(emergencyContacts2.residentId, existingRecord.id));
+      const residentParkings = await db.select({ id: parkings2.id }).from(parkings2).where(eq5(parkings2.residentId, existingRecord.id));
+      for (const p of residentParkings) {
+        await db.delete(parkingPlates2).where(eq5(parkingPlates2.parkingId, p.id));
+      }
+      await db.delete(parkings2).where(eq5(parkings2.residentId, existingRecord.id));
+      await db.delete(residents2).where(eq5(residents2.id, existingRecord.id));
+    }
+    return { success: true, message: "Resident deleted", action: "deleted" };
+  }
+  if (existingRecord) {
+    await db.update(residents2).set(residentData).where(eq5(residents2.id, existingRecord.id));
+    if (newData.emergencyContacts) {
+      await db.delete(emergencyContacts2).where(eq5(emergencyContacts2.residentId, existingRecord.id));
+      for (const contact of newData.emergencyContacts) {
+        await db.insert(emergencyContacts2).values({
+          residentId: existingRecord.id,
+          name: contact.name,
+          phone: contact.phone || null,
+          relationship: contact.relation || null,
+          address: contact.address || null
+        });
+      }
+    }
+    return { success: true, message: "Resident updated", action: "updated" };
+  } else {
+    const insertResult = await db.insert(residents2).values(residentData);
+    const insertedId = insertResult?.[0]?.insertId || insertResult?.insertId;
+    if (newData.emergencyContacts && insertedId) {
+      for (const contact of newData.emergencyContacts) {
+        if (contact.name) {
+          await db.insert(emergencyContacts2).values({
+            residentId: insertedId,
+            name: contact.name,
+            phone: contact.phone || null,
+            relationship: contact.relation || null,
+            address: contact.address || null
+          });
+        }
+      }
+    }
+    return { success: true, message: "Resident inserted", action: "inserted" };
+  }
+}
+async function syncEmergencyContact(db, req) {
+  const { emergencyContacts: emergencyContacts2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(emergencyContacts2).where(eq5(emergencyContacts2.id, req.keyValue));
+    return { success: true, message: "Emergency contact deleted", action: "deleted" };
+  }
+  const existing = await db.select().from(emergencyContacts2).where(
+    and(
+      eq5(emergencyContacts2.residentId, req.data.residentId),
+      eq5(emergencyContacts2.name, req.data.name)
+    )
+  ).limit(1);
+  const data = { ...req.data };
+  delete data.id;
+  if (existing[0]) {
+    await db.update(emergencyContacts2).set(data).where(eq5(emergencyContacts2.id, existing[0].id));
+    return { success: true, message: "Emergency contact updated", action: "updated" };
+  } else {
+    await db.insert(emergencyContacts2).values(data);
+    return { success: true, message: "Emergency contact inserted", action: "inserted" };
+  }
+}
+async function syncRepairRequest(db, req) {
+  const { repairRequests: repairRequests2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    const deleted = await db.delete(repairRequests2).where(eq5(repairRequests2.id, req.keyValue)).returning({ id: repairRequests2.id });
+    if (deleted.length === 0) {
+      await db.delete(repairRequests2).where(eq5(repairRequests2.id, req.data.id));
+    }
+    return { success: true, message: "Repair request deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  const existing = await db.select().from(repairRequests2).where(eq5(repairRequests2.id, req.keyValue)).limit(1);
+  if (existing[0]) {
+    await db.update(repairRequests2).set(data).where(eq5(repairRequests2.id, existing[0].id));
+    return { success: true, message: "Repair request updated", action: "updated" };
+  } else {
+    await db.insert(repairRequests2).values(data);
+    return { success: true, message: "Repair request inserted", action: "inserted" };
+  }
+}
+async function syncRenovationApplication(db, req) {
+  const { renovationApplications: renovationApplications2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(renovationApplications2).where(eq5(renovationApplications2.id, req.keyValue));
+    return { success: true, message: "Renovation application deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  const existing = await db.select().from(renovationApplications2).where(eq5(renovationApplications2.id, req.keyValue)).limit(1);
+  if (existing[0]) {
+    await db.update(renovationApplications2).set(data).where(eq5(renovationApplications2.id, existing[0].id));
+    return { success: true, message: "Renovation application updated", action: "updated" };
+  } else {
+    await db.insert(renovationApplications2).values(data);
+    return { success: true, message: "Renovation application inserted", action: "inserted" };
+  }
+}
+async function syncResourceFolder(db, req) {
+  const { resourceFolders: resourceFolders2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(resourceFolders2).where(eq5(resourceFolders2.id, req.keyValue));
+    return { success: true, message: "Resource folder deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  const existing = await db.select().from(resourceFolders2).where(eq5(resourceFolders2.id, req.keyValue)).limit(1);
+  if (existing[0]) {
+    await db.update(resourceFolders2).set(data).where(eq5(resourceFolders2.id, existing[0].id));
+    return { success: true, message: "Resource folder updated", action: "updated" };
+  } else {
+    await db.insert(resourceFolders2).values(data);
+    return { success: true, message: "Resource folder inserted", action: "inserted" };
+  }
+}
+async function syncResourceFile(db, req) {
+  const { resourceFiles: resourceFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(resourceFiles2).where(eq5(resourceFiles2.id, req.keyValue));
+    return { success: true, message: "Resource file deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  const existing = await db.select().from(resourceFiles2).where(eq5(resourceFiles2.id, req.keyValue)).limit(1);
+  if (existing[0]) {
+    await db.update(resourceFiles2).set(data).where(eq5(resourceFiles2.id, existing[0].id));
+    return { success: true, message: "Resource file updated", action: "updated" };
+  } else {
+    await db.insert(resourceFiles2).values(data);
+    return { success: true, message: "Resource file inserted", action: "inserted" };
+  }
+}
+async function syncInvitedUser(db, req) {
+  const { invitedUsers: invitedUsers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(invitedUsers2).where(eq5(invitedUsers2.id, req.keyValue));
+    return { success: true, message: "Invited user deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  if (data.email) {
+    const existing = await db.select().from(invitedUsers2).where(eq5(invitedUsers2.email, data.email)).limit(1);
+    if (existing[0]) {
+      await db.update(invitedUsers2).set(data).where(eq5(invitedUsers2.id, existing[0].id));
+      return { success: true, message: "Invited user updated", action: "updated" };
+    }
+  }
+  await db.insert(invitedUsers2).values(data);
+  return { success: true, message: "Invited user inserted", action: "inserted" };
+}
+async function syncParking(db, req) {
+  const { parkings: parkings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(parkings2).where(eq5(parkings2.id, req.keyValue));
+    return { success: true, message: "Parking deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  const existing = await db.select().from(parkings2).where(eq5(parkings2.id, req.keyValue)).limit(1);
+  if (existing[0]) {
+    await db.update(parkings2).set(data).where(eq5(parkings2.id, existing[0].id));
+    return { success: true, message: "Parking updated", action: "updated" };
+  } else {
+    await db.insert(parkings2).values(data);
+    return { success: true, message: "Parking inserted", action: "inserted" };
+  }
+}
+async function syncParkingPlate(db, req) {
+  const { parkingPlates: parkingPlates2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+  const { eq: eq5 } = await import("drizzle-orm");
+  if (req.operation === "delete") {
+    await db.delete(parkingPlates2).where(eq5(parkingPlates2.id, req.keyValue));
+    return { success: true, message: "Parking plate deleted", action: "deleted" };
+  }
+  const data = { ...req.data };
+  delete data.id;
+  const existing = await db.select().from(parkingPlates2).where(eq5(parkingPlates2.id, req.keyValue)).limit(1);
+  if (existing[0]) {
+    await db.update(parkingPlates2).set(data).where(eq5(parkingPlates2.id, existing[0].id));
+    return { success: true, message: "Parking plate updated", action: "updated" };
+  } else {
+    await db.insert(parkingPlates2).values(data);
+    return { success: true, message: "Parking plate inserted", action: "inserted" };
+  }
+}
 
 // server/auth-routes.ts
 import { z as z2 } from "zod";
@@ -1795,6 +2097,11 @@ var repairRequestsWithAuditRouter = router({
       entityId: result.id,
       changes: calculateChanges(null, input)
     });
+    syncToRemote("create", "repair_requests", {
+      ...input,
+      id: result.id
+    }, "id", result.id).catch(() => {
+    });
     return result;
   }),
   update: protectedProcedure.input(z5.object({ id: z5.number(), unitNumber: z5.string().min(1), description: z5.string().min(1), status: z5.enum(["pending", "in_progress", "completed", "cancelled", "resident_self_repair"]).optional(), repairDate: z5.string().optional(), completionDate: z5.string().optional().nullable(), notes: z5.string().optional().nullable() })).mutation(async ({ ctx, input }) => {
@@ -1811,6 +2118,11 @@ var repairRequestsWithAuditRouter = router({
       entityId: id,
       changes: calculateChanges(before || null, result)
     });
+    syncToRemote("update", "repair_requests", {
+      ...input,
+      id
+    }, "id", id).catch(() => {
+    });
     return result;
   }),
   delete: protectedProcedure.input(z5.object({ id: z5.number() })).mutation(async ({ ctx, input }) => {
@@ -1826,6 +2138,10 @@ var repairRequestsWithAuditRouter = router({
       entityId: input.id,
       changes: calculateChanges(before || null, null)
     });
+    if (before) {
+      syncToRemote("delete", "repair_requests", before, "id", input.id).catch(() => {
+      });
+    }
     return { success: true };
   })
 });
@@ -1930,6 +2246,11 @@ var residentsWithAuditRouter = router({
       entityId: residentId,
       changes: calculateChanges(null, input)
     });
+    syncToRemote("create", "residents", {
+      ...input,
+      id: residentId
+    }, "unitNumber", input.unitNumber).catch(() => {
+    });
     return result;
   }),
   update: protectedProcedure.input(z6.object({ id: z6.number(), ...residentInput.shape })).mutation(async ({ ctx, input }) => {
@@ -1962,6 +2283,11 @@ var residentsWithAuditRouter = router({
       entityId: id,
       changes: calculateChanges(before || null, result)
     });
+    syncToRemote("update", "residents", {
+      ...input,
+      id
+    }, "unitNumber", input.unitNumber).catch(() => {
+    });
     console.log("[DEBUG] update: Successfully updated resident:", id);
     return result;
   }),
@@ -1979,6 +2305,10 @@ var residentsWithAuditRouter = router({
       entityId: input.id,
       changes: calculateChanges(before || null, null)
     });
+    if (before) {
+      syncToRemote("delete", "residents", before, "unitNumber", before.unitNumber).catch(() => {
+      });
+    }
     return { success: true };
   }),
   validateUnitNumber: protectedProcedure.input(z6.object({ unitNumber: z6.string() })).query(({ input }) => {
@@ -2030,6 +2360,11 @@ var residentsWithAuditRouter = router({
           changes: calculateChanges(null, residentData)
         });
         results.push({ success: true, unitNumber: residentData.unitNumber });
+        syncToRemote("create", "residents", {
+          ...residentData,
+          id: residentId
+        }, "unitNumber", residentData.unitNumber).catch(() => {
+        });
       } catch (error) {
         results.push({
           success: false,
@@ -2054,6 +2389,10 @@ var residentsWithAuditRouter = router({
         entity: "resident",
         entityId: resident.id,
         changes: calculateChanges(resident, null)
+      });
+    }
+    for (const resident of residents_list) {
+      syncToRemote("delete", "residents", resident, "unitNumber", resident.unitNumber).catch(() => {
       });
     }
     return { success: true, deletedCount: residents_list.length };
@@ -2241,6 +2580,12 @@ var renovationApplicationsRouter = router({
       decorationDepositStatus: input.decorationDepositStatus || "notPaid",
       notes: input.notes || null
     });
+    const insertId = result?.[0]?.insertId || result?.insertId;
+    syncToRemote("create", "renovation_applications", {
+      ...input,
+      id: insertId
+    }, "id", insertId).catch(() => {
+    });
     return result;
   }),
   update: protectedProcedure.input(
@@ -2274,12 +2619,19 @@ var renovationApplicationsRouter = router({
       decorationDepositStatus: data.decorationDepositStatus || void 0,
       notes: data.notes || null
     }).where(eq3(renovationApplications.id, id));
+    syncToRemote("update", "renovation_applications", {
+      ...input,
+      id: input.id
+    }, "id", input.id).catch(() => {
+    });
     return result;
   }),
   delete: protectedProcedure.input(z8.object({ id: z8.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const result = await db.delete(renovationApplications).where(eq3(renovationApplications.id, input.id));
+    syncToRemote("delete", "renovation_applications", { id: input.id }, "id", input.id).catch(() => {
+    });
     return result;
   })
 });
@@ -2309,6 +2661,12 @@ var resourceLibraryRouter = router({
       name: input.name,
       description: input.description
     });
+    const folderId = result?.[0]?.insertId || result?.insertId;
+    syncToRemote("create", "resource_folders", {
+      ...input,
+      id: folderId
+    }, "id", folderId).catch(() => {
+    });
     return result;
   }),
   updateFolder: protectedProcedure.input(
@@ -2324,12 +2682,19 @@ var resourceLibraryRouter = router({
       name: input.name,
       description: input.description
     }).where(eq4(resourceFolders.id, input.id));
+    syncToRemote("update", "resource_folders", {
+      ...input,
+      id: input.id
+    }, "id", input.id).catch(() => {
+    });
     return result;
   }),
   deleteFolder: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const result = await db.delete(resourceFolders).where(eq4(resourceFolders.id, input.id));
+    syncToRemote("delete", "resource_folders", { id: input.id }, "id", input.id).catch(() => {
+    });
     return result;
   }),
   // 檔案操作
@@ -2358,6 +2723,12 @@ var resourceLibraryRouter = router({
       fileType: input.fileType,
       uploadedBy: ctx.user?.id
     });
+    const fileId = result?.[0]?.insertId || result?.insertId;
+    syncToRemote("create", "resource_files", {
+      ...input,
+      id: fileId
+    }, "id", fileId).catch(() => {
+    });
     return result;
   }),
   updateFile: protectedProcedure.input(
@@ -2376,12 +2747,19 @@ var resourceLibraryRouter = router({
       updateData.fileUrl = input.fileUrl;
     }
     const result = await db.update(resourceFiles).set(updateData).where(eq4(resourceFiles.id, input.id));
+    syncToRemote("update", "resource_files", {
+      ...input,
+      id: input.id
+    }, "id", input.id).catch(() => {
+    });
     return result;
   }),
   deleteFile: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
     const result = await db.delete(resourceFiles).where(eq4(resourceFiles.id, input.id));
+    syncToRemote("delete", "resource_files", { id: input.id }, "id", input.id).catch(() => {
+    });
     return result;
   }),
   // 獲取檔案詳情
@@ -2670,6 +3048,13 @@ var invitedUsersRouter = router({
         description: `Added invited user: ${input.email}`,
         details: { email: input.email, role: input.role }
       });
+      syncToRemote("create", "invited_users", {
+        email: input.email,
+        name: input.name || input.email,
+        role: input.role,
+        notes: input.notes
+      }, "email", input.email).catch(() => {
+      });
       return { success: true, message: "\u53D7\u9080\u4EBA\u54E1\u6DFB\u52A0\u6210\u529F" };
     } catch (error) {
       throw new Error(error.message || "\u6DFB\u52A0\u53D7\u9080\u4EBA\u54E1\u5931\u6557");
@@ -2693,6 +3078,10 @@ var invitedUsersRouter = router({
         description: `Deleted invited user: ${invited.email}`,
         details: { id: input.id }
       });
+      if (invited) {
+        syncToRemote("delete", "invited_users", invited, "email", invited.email).catch(() => {
+        });
+      }
       return { success: true, message: "\u53D7\u9080\u4EBA\u54E1\u522A\u9664\u6210\u529F" };
     } catch (error) {
       throw new Error(error.message || "\u522A\u9664\u53D7\u9080\u4EBA\u54E1\u5931\u6557");
@@ -2732,6 +3121,13 @@ var invitedUsersRouter = router({
         description: `Updated invited user status: ${invited.email} -> ${input.status}`,
         details: { status: input.status }
       });
+      if (invited) {
+        syncToRemote("update", "invited_users", {
+          ...invited,
+          status: input.status
+        }, "email", invited.email).catch(() => {
+        });
+      }
       return { success: true, message: "\u72C0\u614B\u66F4\u65B0\u6210\u529F" };
     } catch (error) {
       throw new Error(error.message || "\u66F4\u65B0\u72C0\u614B\u5931\u6557");
@@ -3001,6 +3397,35 @@ router2.post("/upload", upload.single("file"), async (req, res) => {
 });
 var upload_routes_default = router2;
 
+// server/sync-routes.ts
+import { Router as Router3 } from "express";
+var router3 = Router3();
+router3.post("/sync", async (req, res) => {
+  try {
+    const apiKey = req.headers["x-sync-api-key"];
+    if (!apiKey || apiKey !== SYNC_API_KEY) {
+      return res.status(401).json({ success: false, message: "Invalid API key" });
+    }
+    const syncSource = req.headers["x-sync-source"];
+    if (syncSource === "resident-management") {
+      return res.json({ success: true, message: "Skipped - source is self", action: "skipped" });
+    }
+    const syncReq = req.body;
+    if (!syncReq.operation || !syncReq.table || !syncReq.data) {
+      return res.status(400).json({ success: false, message: "Invalid request body" });
+    }
+    const result = await handleSyncRequest(syncReq);
+    res.json(result);
+  } catch (error) {
+    console.error("[SYNC] \u540C\u6B65\u7AEF\u9EDE\u932F\u8AA4:", error);
+    res.status(500).json({
+      success: false,
+      message: `Internal error: ${error instanceof Error ? error.message : String(error)}`
+    });
+  }
+});
+var sync_routes_default = router3;
+
 // server/_core/index.ts
 function isPortAvailable(port) {
   return new Promise((resolve) => {
@@ -3044,6 +3469,7 @@ function createApp() {
   app.use(express3.urlencoded({ limit: "50mb", extended: true }));
   app.use("/api/residents", residentsExportRouter);
   app.use("/api", upload_routes_default);
+  app.use("/api", sync_routes_default);
   app.use(
     "/api/trpc",
     createExpressMiddleware({
