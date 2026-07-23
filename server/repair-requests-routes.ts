@@ -9,6 +9,7 @@ import {
 } from "./db";
 import { logAuditEvent, calculateChanges } from "./audit-log";
 import { requirePasswordAuth } from "./password-auth-middleware";
+import { syncToRemote } from "./sync-handler";
 
 const repairRequestInput = z.object({
   unitNumber: z.string().min(1, "戶號為必填"),
@@ -62,6 +63,12 @@ export const repairRequestsWithAuditRouter = router({
         changes: calculateChanges(null, input as any),
       });
 
+      // 同步到備援系統
+      syncToRemote("create", "repair_requests", {
+        ...input,
+        id: (result as any).id,
+      }, "id", (result as any).id).catch(() => {});
+
       return result;
     }),
 
@@ -86,6 +93,12 @@ export const repairRequestsWithAuditRouter = router({
         changes: calculateChanges(before || null, result as any),
       });
 
+      // 同步到備援系統
+      syncToRemote("update", "repair_requests", {
+        ...input,
+        id: id,
+      }, "id", id).catch(() => {});
+
       return result;
     }),
 
@@ -108,6 +121,11 @@ export const repairRequestsWithAuditRouter = router({
         entityId: input.id,
         changes: calculateChanges(before || null, null),
       });
+
+      // 同步到備援系統
+      if (before) {
+        syncToRemote("delete", "repair_requests", before, "id", input.id).catch(() => {});
+      }
 
       return { success: true };
     }),

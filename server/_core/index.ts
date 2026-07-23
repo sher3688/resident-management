@@ -9,6 +9,7 @@ import { serveStatic } from "./vite";
 import { residentsExportRouter } from "../residents-export";
 import { initializeDemoUsers } from "../password-auth";
 import uploadRoutes from "../upload-routes";
+import syncRoutes from "../sync-routes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -63,6 +64,9 @@ export function createApp(): express.Express {
 
   // File upload API
   app.use("/api", uploadRoutes);
+
+  // Sync API (bidirectional data sync)
+  app.use("/api", syncRoutes);
 
   // tRPC API
   app.use(

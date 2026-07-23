@@ -30,6 +30,7 @@ import {
 import { getDb } from "./db";
 import { adminProcedure } from "./_core/trpc";
 import { residents } from "../drizzle/schema";
+import { syncToRemote } from "./sync-handler";
 import { passwordAuthRouter } from "./auth-routes";
 import { passwordUserManagementRouter } from "./password-user-routes";
 import { auditLogRouter } from "./audit-log-routes";
@@ -355,6 +356,14 @@ const invitedUsersRouter = router({
           details: { email: input.email, role: input.role },
         });
 
+        // 同步到備援系統
+        syncToRemote("create", "invited_users", {
+          email: input.email,
+          name: input.name || input.email,
+          role: input.role,
+          notes: input.notes,
+        }, "email", input.email).catch(() => {});
+
         return { success: true, message: "受邀人員添加成功" };
       } catch (error: any) {
         throw new Error(error.message || "添加受邀人員失敗");
@@ -384,6 +393,11 @@ const invitedUsersRouter = router({
           description: `Deleted invited user: ${invited.email}`,
           details: { id: input.id },
         });
+
+        // 同步到備援系統
+        if (invited) {
+          syncToRemote("delete", "invited_users", invited, "email", invited.email).catch(() => {});
+        }
 
         return { success: true, message: "受邀人員刪除成功" };
       } catch (error: any) {
@@ -434,6 +448,14 @@ const invitedUsersRouter = router({
           description: `Updated invited user status: ${invited.email} -> ${input.status}`,
           details: { status: input.status },
         });
+
+        // 同步到備援系統
+        if (invited) {
+          syncToRemote("update", "invited_users", {
+            ...invited,
+            status: input.status,
+          }, "email", invited.email).catch(() => {});
+        }
 
         return { success: true, message: "狀態更新成功" };
       } catch (error: any) {

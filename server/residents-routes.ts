@@ -21,6 +21,7 @@ import {
 } from "./db";
 import { logAuditEvent, calculateChanges } from "./audit-log";
 import { requirePasswordAuth } from "./password-auth-middleware";
+import { syncToRemote } from "./sync-handler";
 
 const emergencyContactInput = z.object({
   id: z.number().optional(),
@@ -134,6 +135,12 @@ export const residentsWithAuditRouter = router({
         changes: calculateChanges(null, input as any),
       });
 
+      // 同步到備援系統
+      syncToRemote("create", "residents", {
+        ...input,
+        id: residentId,
+      }, "unitNumber", input.unitNumber).catch(() => {});
+
       return result;
     }),
 
@@ -176,6 +183,12 @@ export const residentsWithAuditRouter = router({
         changes: calculateChanges(before || null, result as any),
       });
 
+      // 同步到備援系統
+      syncToRemote("update", "residents", {
+        ...input,
+        id: id,
+      }, "unitNumber", input.unitNumber).catch(() => {});
+
       console.log('[DEBUG] update: Successfully updated resident:', id);
       return result;
     }),
@@ -201,6 +214,11 @@ export const residentsWithAuditRouter = router({
         entityId: input.id,
         changes: calculateChanges(before || null, null),
       });
+
+      // 同步到備援系統
+      if (before) {
+        syncToRemote("delete", "residents", before, "unitNumber", before.unitNumber).catch(() => {});
+      }
 
       return { success: true };
     }),
@@ -268,6 +286,12 @@ export const residentsWithAuditRouter = router({
           });
 
           results.push({ success: true, unitNumber: residentData.unitNumber });
+
+          // 同步到備援系統
+          syncToRemote("create", "residents", {
+            ...residentData,
+            id: residentId,
+          }, "unitNumber", residentData.unitNumber).catch(() => {});
         } catch (error) {
           results.push({
             success: false,
@@ -297,6 +321,11 @@ export const residentsWithAuditRouter = router({
         entityId: resident.id,
         changes: calculateChanges(resident, null),
       });
+    }
+
+    // 同步刪除到備援系統
+    for (const resident of residents_list) {
+      syncToRemote("delete", "residents", resident, "unitNumber", resident.unitNumber).catch(() => {});
     }
 
     return { success: true, deletedCount: residents_list.length };

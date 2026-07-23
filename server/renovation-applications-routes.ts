@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { renovationApplications } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import { syncToRemote } from "./sync-handler";
 
 export const renovationApplicationsRouter = router({
   list: protectedProcedure.query(async () => {
@@ -56,6 +57,13 @@ export const renovationApplicationsRouter = router({
         decorationDepositStatus: input.decorationDepositStatus || "notPaid",
         notes: input.notes || null,
       });
+      // 同步到備援系統
+      const insertId = (result as any)?.[0]?.insertId || (result as any)?.insertId;
+      syncToRemote("create", "renovation_applications", {
+        ...input,
+        id: insertId,
+      }, "id", insertId).catch(() => {});
+
       return result;
     }),
 
@@ -95,6 +103,12 @@ export const renovationApplicationsRouter = router({
           notes: data.notes || null,
         })
         .where(eq(renovationApplications.id, id));
+      // 同步到備援系統
+      syncToRemote("update", "renovation_applications", {
+        ...input,
+        id: input.id,
+      }, "id", input.id).catch(() => {});
+
       return result;
     }),
 
@@ -106,6 +120,9 @@ export const renovationApplicationsRouter = router({
       const result = await db
         .delete(renovationApplications)
         .where(eq(renovationApplications.id, input.id));
+      // 同步到備援系統
+      syncToRemote("delete", "renovation_applications", { id: input.id }, "id", input.id).catch(() => {});
+
       return result;
     }),
 });

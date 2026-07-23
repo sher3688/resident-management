@@ -3,6 +3,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
 import { resourceFolders, resourceFiles } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
+import { syncToRemote } from "./sync-handler";
 
 export const resourceLibraryRouter = router({
   // 文件夾操作
@@ -30,6 +31,13 @@ export const resourceLibraryRouter = router({
         name: input.name,
         description: input.description,
       });
+      // 同步到備援系統
+      const folderId = (result as any)?.[0]?.insertId || (result as any)?.insertId;
+      syncToRemote("create", "resource_folders", {
+        ...input,
+        id: folderId,
+      }, "id", folderId).catch(() => {});
+
       return result;
     }),
 
@@ -51,6 +59,12 @@ export const resourceLibraryRouter = router({
           description: input.description,
         })
         .where(eq(resourceFolders.id, input.id));
+      // 同步到備援系統
+      syncToRemote("update", "resource_folders", {
+        ...input,
+        id: input.id,
+      }, "id", input.id).catch(() => {});
+
       return result;
     }),
 
@@ -62,6 +76,9 @@ export const resourceLibraryRouter = router({
       const result = await db
         .delete(resourceFolders)
         .where(eq(resourceFolders.id, input.id));
+      // 同步到備援系統
+      syncToRemote("delete", "resource_folders", { id: input.id }, "id", input.id).catch(() => {});
+
       return result;
     }),
 
@@ -100,6 +117,13 @@ export const resourceLibraryRouter = router({
         fileType: input.fileType,
         uploadedBy: ctx.user?.id,
       });
+      // 同步到備援系統
+      const fileId = (result as any)?.[0]?.insertId || (result as any)?.insertId;
+      syncToRemote("create", "resource_files", {
+        ...input,
+        id: fileId,
+      }, "id", fileId).catch(() => {});
+
       return result;
     }),
 
@@ -124,6 +148,12 @@ export const resourceLibraryRouter = router({
         .update(resourceFiles)
         .set(updateData)
         .where(eq(resourceFiles.id, input.id));
+      // 同步到備援系統
+      syncToRemote("update", "resource_files", {
+        ...input,
+        id: input.id,
+      }, "id", input.id).catch(() => {});
+
       return result;
     }),
 
@@ -135,6 +165,9 @@ export const resourceLibraryRouter = router({
       const result = await db
         .delete(resourceFiles)
         .where(eq(resourceFiles.id, input.id));
+      // 同步到備援系統
+      syncToRemote("delete", "resource_files", { id: input.id }, "id", input.id).catch(() => {});
+
       return result;
     }),
 
