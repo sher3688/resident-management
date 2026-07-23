@@ -106,7 +106,10 @@ function toPage(table: BaselineSyncTable, rows: Array<Record<string, unknown>>, 
 }
 
 async function getResidentsPage(db: any, cursor: number, limit: number): Promise<BaselinePage> {
+  // listRowsById 會多取得一筆，供 cursor 分頁正確判斷是否尚有下一頁。
+  // 將住戶包裝為包含同住人的 payload 時，不能遺失這一筆 hasMore 資訊。
   const rows = await listRowsById(db, residents, cursor, limit);
+  const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
   const residentIds = pageRows.map((row: { id: number }) => row.id);
   const allCoResidents = residentIds.length > 0
@@ -125,8 +128,14 @@ async function getResidentsPage(db: any, cursor: number, limit: number): Promise
     // 緊急聯絡人與車位在後續專屬頁面處理，避免基準回填造成子資料整批刪除。
     coResidents: coResidentsByResidentId.get(Number(row.id)) ?? [],
   }));
+  const lastId = pageRows.at(-1)?.id;
 
-  return toPage("residents", records, limit);
+  return {
+    table: "residents",
+    records,
+    nextCursor: hasMore && typeof lastId === "number" ? lastId : null,
+    hasMore,
+  };
 }
 
 /**

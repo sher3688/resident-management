@@ -3793,6 +3793,7 @@ function toPage(table, rows, limit) {
 }
 async function getResidentsPage(db, cursor, limit) {
   const rows = await listRowsById(db, residents, cursor, limit);
+  const hasMore = rows.length > limit;
   const pageRows = rows.slice(0, limit);
   const residentIds = pageRows.map((row) => row.id);
   const allCoResidents = residentIds.length > 0 ? await db.select().from(coResidents).where(inArray2(coResidents.residentId, residentIds)) : [];
@@ -3807,7 +3808,13 @@ async function getResidentsPage(db, cursor, limit) {
     // 緊急聯絡人與車位在後續專屬頁面處理，避免基準回填造成子資料整批刪除。
     coResidents: coResidentsByResidentId.get(Number(row.id)) ?? []
   }));
-  return toPage("residents", records, limit);
+  const lastId = pageRows.at(-1)?.id;
+  return {
+    table: "residents",
+    records,
+    nextCursor: hasMore && typeof lastId === "number" ? lastId : null,
+    hasMore
+  };
 }
 async function getBaselinePage(table, cursor = 0, requestedLimit) {
   const db = await getDb();
