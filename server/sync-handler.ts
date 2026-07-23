@@ -212,16 +212,17 @@ async function syncMappedRecord(
     return { success: true, message: `${label} deleted`, action: "deleted" };
   }
 
-  let values = preparedData(req.data);
-  if (transform) {
-    values = await transform(values);
-  }
+  // 自然鍵比對必須使用尚未轉換的來源資料。子項的 transform 會把來源外鍵轉為
+  // 本機外鍵；若先轉換再傳入 finder，finder 會把本機 ID 再誤解為來源 ID。
+  const sourceValues = preparedData(req.data);
 
   let localRecordId: number | null = mapping ? Number(mapping.localRecordId) : null;
   if (!localRecordId && findExisting) {
-    const naturalMatch = await findExisting(values);
+    const naturalMatch = await findExisting(sourceValues);
     localRecordId = naturalMatch?.id ?? null;
   }
+
+  const values = transform ? await transform(sourceValues) : sourceValues;
 
   if (localRecordId !== null) {
     const { eq } = await import("drizzle-orm");

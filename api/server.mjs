@@ -1358,15 +1358,13 @@ async function syncMappedRecord(db, req, entityTable, label, transform, findExis
     await deleteRecordMapping(db, req);
     return { success: true, message: `${label} deleted`, action: "deleted" };
   }
-  let values = preparedData(req.data);
-  if (transform) {
-    values = await transform(values);
-  }
+  const sourceValues = preparedData(req.data);
   let localRecordId = mapping ? Number(mapping.localRecordId) : null;
   if (!localRecordId && findExisting) {
-    const naturalMatch = await findExisting(values);
+    const naturalMatch = await findExisting(sourceValues);
     localRecordId = naturalMatch?.id ?? null;
   }
+  const values = transform ? await transform(sourceValues) : sourceValues;
   if (localRecordId !== null) {
     const { eq: eq7 } = await import("drizzle-orm");
     await db.update(entityTable).set(values).where(eq7(entityTable.id, localRecordId));
