@@ -122,3 +122,5 @@ if (!isVercel) {
     process.exit(1);
   });
 }
+
+// Sync v2 - 86515(date +%Y%m%d-%H%M%S)
