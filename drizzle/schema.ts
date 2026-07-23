@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, varchar, integer, serial, timestamp, text, jsonb, date } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, varchar, integer, serial, timestamp, text, jsonb, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 export const parkingTypeEnum = pgEnum("parking_type", ["car", "motorcycle", "bicycle"]);
@@ -306,3 +306,32 @@ export const DECORATION_DEPOSIT_STATUS = {
   PAID: 'paid',
   REFUNDED: 'refunded',
 } as const;
+
+// ─── 跨系統同步映射表 ────────────────────────────────────────────────────────────────
+// 自增 ID 只在各自資料庫內有效；此表保存來源系統記錄與本機記錄的穩定對應。
+export const syncRecordMappings = pgTable(
+  "sync_record_mappings",
+  {
+    id: serial("id").primaryKey(),
+    originSystem: varchar("originSystem", { length: 64 }).notNull(),
+    entityType: varchar("entityType", { length: 64 }).notNull(),
+    originRecordId: varchar("originRecordId", { length: 128 }).notNull(),
+    localRecordId: varchar("localRecordId", { length: 128 }).notNull(),
+    sourceUpdatedAt: text("sourceUpdatedAt"),
+    createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("sync_record_mappings_origin_unique").on(
+      table.originSystem,
+      table.entityType,
+      table.originRecordId,
+    ),
+    index("sync_record_mappings_local_lookup").on(
+      table.entityType,
+      table.localRecordId,
+    ),
+  ],
+);
+
+export type SyncRecordMapping = typeof syncRecordMappings.$inferSelect;
