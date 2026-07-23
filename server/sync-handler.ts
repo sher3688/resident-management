@@ -35,6 +35,8 @@ export interface SyncRequest {
   keyValue: unknown;
   sourceSystem: string;
   timestamp: string;
+  /** 僅供受控的一次性既有資料回填標記；不改變既有即時同步的預設行為。 */
+  mode?: "baseline" | "realtime";
 }
 
 export interface SyncResponse {

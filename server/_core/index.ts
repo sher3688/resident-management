@@ -10,6 +10,7 @@ import { residentsExportRouter } from "../residents-export";
 import { initializeDemoUsers } from "../password-auth";
 import uploadRoutes from "../upload-routes";
 import syncRoutes from "../sync-routes";
+import syncBaselineRoutes from "../sync-baseline-routes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -67,6 +68,8 @@ export function createApp(): express.Express {
 
   // Sync API (bidirectional data sync)
   app.use("/api", syncRoutes);
+  // Protected, page-by-page baseline synchronization API
+  app.use("/api", syncBaselineRoutes);
 
   // tRPC API
   app.use(

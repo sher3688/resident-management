@@ -1353,8 +1353,8 @@ async function syncMappedRecord(db, req, entityTable, label, transform, findExis
     if (!mapping) {
       return { success: true, message: `Skipped - no mapping for ${label} delete`, action: "skipped" };
     }
-    const { eq: eq6 } = await import("drizzle-orm");
-    await db.delete(entityTable).where(eq6(entityTable.id, Number(mapping.localRecordId)));
+    const { eq: eq7 } = await import("drizzle-orm");
+    await db.delete(entityTable).where(eq7(entityTable.id, Number(mapping.localRecordId)));
     await deleteRecordMapping(db, req);
     return { success: true, message: `${label} deleted`, action: "deleted" };
   }
@@ -1368,8 +1368,8 @@ async function syncMappedRecord(db, req, entityTable, label, transform, findExis
     localRecordId = naturalMatch?.id ?? null;
   }
   if (localRecordId !== null) {
-    const { eq: eq6 } = await import("drizzle-orm");
-    await db.update(entityTable).set(values).where(eq6(entityTable.id, localRecordId));
+    const { eq: eq7 } = await import("drizzle-orm");
+    await db.update(entityTable).set(values).where(eq7(entityTable.id, localRecordId));
     await upsertRecordMapping(db, req, localRecordId);
     return { success: true, message: `${label} updated`, action: mapping ? "updated" : "upserted" };
   }
@@ -1382,7 +1382,7 @@ async function syncMappedRecord(db, req, entityTable, label, transform, findExis
 }
 async function syncResident(db, req) {
   const { residents: residents2, coResidents: coResidents3, emergencyContacts: emergencyContacts2, parkings: parkings2, parkingPlates: parkingPlates2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq6 } = await import("drizzle-orm");
+  const { eq: eq7 } = await import("drizzle-orm");
   const unitNumber = req.data?.unitNumber;
   if (!unitNumber) {
     return { success: false, message: "Missing unitNumber" };
@@ -1391,25 +1391,25 @@ async function syncResident(db, req) {
   if (isDuplicateOrStaleEvent(mapping, req.timestamp)) {
     return { success: true, message: "Skipped - duplicate or stale source event", action: "skipped" };
   }
-  const existing = mapping ? await db.select().from(residents2).where(eq6(residents2.id, Number(mapping.localRecordId))).limit(1) : await db.select().from(residents2).where(eq6(residents2.unitNumber, unitNumber)).limit(1);
+  const existing = mapping ? await db.select().from(residents2).where(eq7(residents2.id, Number(mapping.localRecordId))).limit(1) : await db.select().from(residents2).where(eq7(residents2.unitNumber, unitNumber)).limit(1);
   const resident = existing[0] ?? null;
   if (req.operation === "delete") {
     if (!mapping) {
       return { success: true, message: "Skipped - no mapping for resident delete", action: "skipped" };
     }
     if (resident) {
-      const parkingRows = await db.select({ id: parkings2.id }).from(parkings2).where(eq6(parkings2.residentId, resident.id));
+      const parkingRows = await db.select({ id: parkings2.id }).from(parkings2).where(eq7(parkings2.residentId, resident.id));
       const parkingIds = parkingRows.map((row) => row.id);
-      const contactRows = await db.select({ id: emergencyContacts2.id }).from(emergencyContacts2).where(eq6(emergencyContacts2.residentId, resident.id));
+      const contactRows = await db.select({ id: emergencyContacts2.id }).from(emergencyContacts2).where(eq7(emergencyContacts2.residentId, resident.id));
       const contactIds = contactRows.map((row) => row.id);
-      const coResidentRows = await db.select({ id: coResidents3.id }).from(coResidents3).where(eq6(coResidents3.residentId, resident.id));
+      const coResidentRows = await db.select({ id: coResidents3.id }).from(coResidents3).where(eq7(coResidents3.residentId, resident.id));
       for (const parkingId of parkingIds) {
-        await db.delete(parkingPlates2).where(eq6(parkingPlates2.parkingId, parkingId));
+        await db.delete(parkingPlates2).where(eq7(parkingPlates2.parkingId, parkingId));
       }
-      await db.delete(parkings2).where(eq6(parkings2.residentId, resident.id));
-      await db.delete(emergencyContacts2).where(eq6(emergencyContacts2.residentId, resident.id));
-      await db.delete(coResidents3).where(eq6(coResidents3.residentId, resident.id));
-      await db.delete(residents2).where(eq6(residents2.id, resident.id));
+      await db.delete(parkings2).where(eq7(parkings2.residentId, resident.id));
+      await db.delete(emergencyContacts2).where(eq7(emergencyContacts2.residentId, resident.id));
+      await db.delete(coResidents3).where(eq7(coResidents3.residentId, resident.id));
+      await db.delete(residents2).where(eq7(residents2.id, resident.id));
       await deleteMappingsByLocalRecordIds(db, "parking_plates", parkingIds);
       await deleteMappingsByLocalRecordIds(db, "parkings", parkingIds);
       await deleteMappingsByLocalRecordIds(db, "emergency_contacts", contactIds);
@@ -1428,7 +1428,7 @@ async function syncResident(db, req) {
       await upsertRecordMapping(db, req, resident.id);
       return { success: true, message: "Skipped - local resident is newer", action: "skipped" };
     }
-    await db.update(residents2).set(residentData).where(eq6(residents2.id, resident.id));
+    await db.update(residents2).set(residentData).where(eq7(residents2.id, resident.id));
     residentId = resident.id;
   } else {
     const insertedId = await insertAndGetId(db, residents2, residentData);
@@ -1439,7 +1439,7 @@ async function syncResident(db, req) {
   }
   await upsertRecordMapping(db, req, residentId);
   if (Array.isArray(req.data.coResidents)) {
-    await db.delete(coResidents3).where(eq6(coResidents3.residentId, residentId));
+    await db.delete(coResidents3).where(eq7(coResidents3.residentId, residentId));
     for (const coResident of req.data.coResidents) {
       if (!coResident?.name) continue;
       await db.insert(coResidents3).values({
@@ -1450,8 +1450,8 @@ async function syncResident(db, req) {
     }
   }
   if (Array.isArray(req.data.emergencyContacts)) {
-    const oldContacts = await db.select({ id: emergencyContacts2.id }).from(emergencyContacts2).where(eq6(emergencyContacts2.residentId, residentId));
-    await db.delete(emergencyContacts2).where(eq6(emergencyContacts2.residentId, residentId));
+    const oldContacts = await db.select({ id: emergencyContacts2.id }).from(emergencyContacts2).where(eq7(emergencyContacts2.residentId, residentId));
+    await db.delete(emergencyContacts2).where(eq7(emergencyContacts2.residentId, residentId));
     await deleteMappingsByLocalRecordIds(db, "emergency_contacts", oldContacts.map((row) => row.id));
     for (const contact of req.data.emergencyContacts) {
       if (!contact?.name) continue;
@@ -1468,12 +1468,12 @@ async function syncResident(db, req) {
     }
   }
   if (Array.isArray(req.data.parkings)) {
-    const oldParkings = await db.select({ id: parkings2.id }).from(parkings2).where(eq6(parkings2.residentId, residentId));
+    const oldParkings = await db.select({ id: parkings2.id }).from(parkings2).where(eq7(parkings2.residentId, residentId));
     const oldParkingIds = oldParkings.map((row) => row.id);
     for (const parkingId of oldParkingIds) {
-      await db.delete(parkingPlates2).where(eq6(parkingPlates2.parkingId, parkingId));
+      await db.delete(parkingPlates2).where(eq7(parkingPlates2.parkingId, parkingId));
     }
-    await db.delete(parkings2).where(eq6(parkings2.residentId, residentId));
+    await db.delete(parkings2).where(eq7(parkings2.residentId, residentId));
     await deleteMappingsByLocalRecordIds(db, "parking_plates", oldParkingIds);
     await deleteMappingsByLocalRecordIds(db, "parkings", oldParkingIds);
     for (const parking of req.data.parkings) {
@@ -1502,7 +1502,7 @@ async function syncResident(db, req) {
 }
 async function syncEmergencyContact(db, req) {
   const { emergencyContacts: emergencyContacts2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and3, eq: eq6 } = await import("drizzle-orm");
+  const { and: and3, eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1514,14 +1514,14 @@ async function syncEmergencyContact(db, req) {
     }),
     async (data) => {
       const residentId = await requireMappedParentId(db, req.sourceSystem, "residents", data.residentId, "residentId");
-      const matches = await db.select({ id: emergencyContacts2.id }).from(emergencyContacts2).where(and3(eq6(emergencyContacts2.residentId, residentId), eq6(emergencyContacts2.name, data.name))).limit(2);
+      const matches = await db.select({ id: emergencyContacts2.id }).from(emergencyContacts2).where(and3(eq7(emergencyContacts2.residentId, residentId), eq7(emergencyContacts2.name, data.name))).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncRepairRequest(db, req) {
   const { repairRequests: repairRequests2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and3, eq: eq6 } = await import("drizzle-orm");
+  const { and: and3, eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1529,14 +1529,14 @@ async function syncRepairRequest(db, req) {
     "Repair request",
     void 0,
     async (data) => {
-      const matches = await db.select({ id: repairRequests2.id }).from(repairRequests2).where(and3(eq6(repairRequests2.unitNumber, data.unitNumber), eq6(repairRequests2.repairDate, data.repairDate), eq6(repairRequests2.description, data.description))).limit(2);
+      const matches = await db.select({ id: repairRequests2.id }).from(repairRequests2).where(and3(eq7(repairRequests2.unitNumber, data.unitNumber), eq7(repairRequests2.repairDate, data.repairDate), eq7(repairRequests2.description, data.description))).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncRenovationApplication(db, req) {
   const { renovationApplications: renovationApplications2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and3, eq: eq6 } = await import("drizzle-orm");
+  const { and: and3, eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1544,14 +1544,14 @@ async function syncRenovationApplication(db, req) {
     "Renovation application",
     void 0,
     async (data) => {
-      const matches = await db.select({ id: renovationApplications2.id }).from(renovationApplications2).where(and3(eq6(renovationApplications2.unitNumber, data.unitNumber), eq6(renovationApplications2.applicationDate, data.applicationDate), eq6(renovationApplications2.constructionContent, data.constructionContent))).limit(2);
+      const matches = await db.select({ id: renovationApplications2.id }).from(renovationApplications2).where(and3(eq7(renovationApplications2.unitNumber, data.unitNumber), eq7(renovationApplications2.applicationDate, data.applicationDate), eq7(renovationApplications2.constructionContent, data.constructionContent))).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncResourceFolder(db, req) {
   const { resourceFolders: resourceFolders2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq6 } = await import("drizzle-orm");
+  const { eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1559,14 +1559,14 @@ async function syncResourceFolder(db, req) {
     "Resource folder",
     void 0,
     async (data) => {
-      const matches = await db.select({ id: resourceFolders2.id }).from(resourceFolders2).where(eq6(resourceFolders2.name, data.name)).limit(2);
+      const matches = await db.select({ id: resourceFolders2.id }).from(resourceFolders2).where(eq7(resourceFolders2.name, data.name)).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncResourceFile(db, req) {
   const { resourceFiles: resourceFiles2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and3, eq: eq6 } = await import("drizzle-orm");
+  const { and: and3, eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1578,14 +1578,14 @@ async function syncResourceFile(db, req) {
     }),
     async (data) => {
       const folderId = await requireMappedParentId(db, req.sourceSystem, "resource_folders", data.folderId, "folderId");
-      const matches = await db.select({ id: resourceFiles2.id }).from(resourceFiles2).where(and3(eq6(resourceFiles2.folderId, folderId), eq6(resourceFiles2.name, data.name), eq6(resourceFiles2.fileUrl, data.fileUrl))).limit(2);
+      const matches = await db.select({ id: resourceFiles2.id }).from(resourceFiles2).where(and3(eq7(resourceFiles2.folderId, folderId), eq7(resourceFiles2.name, data.name), eq7(resourceFiles2.fileUrl, data.fileUrl))).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncParking(db, req) {
   const { parkings: parkings2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and3, eq: eq6 } = await import("drizzle-orm");
+  const { and: and3, eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1597,14 +1597,14 @@ async function syncParking(db, req) {
     }),
     async (data) => {
       const residentId = await requireMappedParentId(db, req.sourceSystem, "residents", data.residentId, "residentId");
-      const matches = await db.select({ id: parkings2.id }).from(parkings2).where(and3(eq6(parkings2.residentId, residentId), eq6(parkings2.type, data.type), eq6(parkings2.number, data.number))).limit(2);
+      const matches = await db.select({ id: parkings2.id }).from(parkings2).where(and3(eq7(parkings2.residentId, residentId), eq7(parkings2.type, data.type), eq7(parkings2.number, data.number))).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncParkingPlate(db, req) {
   const { parkingPlates: parkingPlates2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { and: and3, eq: eq6 } = await import("drizzle-orm");
+  const { and: and3, eq: eq7 } = await import("drizzle-orm");
   return syncMappedRecord(
     db,
     req,
@@ -1616,26 +1616,26 @@ async function syncParkingPlate(db, req) {
     }),
     async (data) => {
       const parkingId = await requireMappedParentId(db, req.sourceSystem, "parkings", data.parkingId, "parkingId");
-      const matches = await db.select({ id: parkingPlates2.id }).from(parkingPlates2).where(and3(eq6(parkingPlates2.parkingId, parkingId), eq6(parkingPlates2.plate, data.plate))).limit(2);
+      const matches = await db.select({ id: parkingPlates2.id }).from(parkingPlates2).where(and3(eq7(parkingPlates2.parkingId, parkingId), eq7(parkingPlates2.plate, data.plate))).limit(2);
       return matches.length === 1 ? matches[0] : null;
     }
   );
 }
 async function syncInvitedUser(db, req) {
   const { invitedUsers: invitedUsers2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-  const { eq: eq6 } = await import("drizzle-orm");
+  const { eq: eq7 } = await import("drizzle-orm");
   const email = req.keyField === "email" ? req.keyValue : req.data?.email;
   if (!email) {
     return { success: false, message: "Invited user requires an email identifier" };
   }
   if (req.operation === "delete") {
-    await db.delete(invitedUsers2).where(eq6(invitedUsers2.email, String(email)));
+    await db.delete(invitedUsers2).where(eq7(invitedUsers2.email, String(email)));
     return { success: true, message: "Invited user deleted", action: "deleted" };
   }
   const values = preparedData(req.data);
-  const existing = await db.select({ id: invitedUsers2.id }).from(invitedUsers2).where(eq6(invitedUsers2.email, String(email))).limit(1);
+  const existing = await db.select({ id: invitedUsers2.id }).from(invitedUsers2).where(eq7(invitedUsers2.email, String(email))).limit(1);
   if (existing[0]) {
-    await db.update(invitedUsers2).set(values).where(eq6(invitedUsers2.id, existing[0].id));
+    await db.update(invitedUsers2).set(values).where(eq7(invitedUsers2.id, existing[0].id));
     return { success: true, message: "Invited user updated", action: "updated" };
   }
   await db.insert(invitedUsers2).values(values);
@@ -3255,8 +3255,8 @@ var adminRouter = router({
     const db = await getDb();
     if (!db) return [];
     const { userSessions: userSessions2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { eq: eq6 } = await import("drizzle-orm");
-    const sessions = await db.select().from(userSessions2).where(eq6(userSessions2.isActive, 1));
+    const { eq: eq7 } = await import("drizzle-orm");
+    const sessions = await db.select().from(userSessions2).where(eq7(userSessions2.isActive, 1));
     return sessions;
   }),
   forceLogoutUser: adminProcedure.input(z11.object({ sessionId: z11.number() })).mutation(async ({ input }) => {
@@ -3487,7 +3487,7 @@ residentsExportRouter.get("/export", async (req, res) => {
       return res.status(500).json({ error: "Database not available" });
     }
     const { residents: residentsTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-    const { sql: sql2 } = await import("drizzle-orm");
+    const { sql: sql3 } = await import("drizzle-orm");
     const rows = await db.select().from(residentsTable).orderBy(residentsTable.unitNumber);
     const headers = [
       "id",
@@ -3748,6 +3748,322 @@ function createSyncRouter(options = {}) {
 }
 var sync_routes_default = createSyncRouter();
 
+// server/sync-baseline-routes.ts
+import { Router as Router4 } from "express";
+
+// server/sync-baseline.ts
+init_db();
+init_schema();
+import { asc, eq as eq6, gt, inArray as inArray2, sql as sql2 } from "drizzle-orm";
+import { z as z13 } from "zod";
+var baselineSyncTables = [
+  "residents",
+  "emergency_contacts",
+  "parkings",
+  "parking_plates",
+  "repair_requests",
+  "renovation_applications",
+  "resource_folders",
+  "resource_files",
+  "invited_users"
+];
+var baselinePageQuerySchema = z13.object({
+  table: z13.enum(baselineSyncTables),
+  cursor: z13.coerce.number().int().min(0).optional(),
+  limit: z13.coerce.number().int().min(1).max(50).optional()
+}).strict();
+var baselineRunSchema = baselinePageQuerySchema;
+var DEFAULT_BATCH_LIMIT = 25;
+function normalizeLimit(limit) {
+  return Math.min(Math.max(limit ?? DEFAULT_BATCH_LIMIT, 1), 50);
+}
+async function listRowsById(db, entityTable, cursor, limit) {
+  const query = db.select().from(entityTable);
+  const ordered = cursor > 0 ? query.where(gt(entityTable.id, cursor)).orderBy(asc(entityTable.id)) : query.orderBy(asc(entityTable.id));
+  return ordered.limit(limit + 1);
+}
+function toPage(table, rows, limit) {
+  const hasMore = rows.length > limit;
+  const records = rows.slice(0, limit);
+  const lastId = records.at(-1)?.id;
+  return {
+    table,
+    records,
+    nextCursor: hasMore && typeof lastId === "number" ? lastId : null,
+    hasMore
+  };
+}
+async function getResidentsPage(db, cursor, limit) {
+  const rows = await listRowsById(db, residents, cursor, limit);
+  const pageRows = rows.slice(0, limit);
+  const residentIds = pageRows.map((row) => row.id);
+  const allCoResidents = residentIds.length > 0 ? await db.select().from(coResidents).where(inArray2(coResidents.residentId, residentIds)) : [];
+  const coResidentsByResidentId = /* @__PURE__ */ new Map();
+  for (const coResident of allCoResidents) {
+    const existing = coResidentsByResidentId.get(coResident.residentId) ?? [];
+    existing.push(coResident);
+    coResidentsByResidentId.set(coResident.residentId, existing);
+  }
+  const records = pageRows.map((row) => ({
+    ...row,
+    // 緊急聯絡人與車位在後續專屬頁面處理，避免基準回填造成子資料整批刪除。
+    coResidents: coResidentsByResidentId.get(Number(row.id)) ?? []
+  }));
+  return toPage("residents", records, limit);
+}
+async function getBaselinePage(table, cursor = 0, requestedLimit) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Synchronization database is unavailable");
+  }
+  const limit = normalizeLimit(requestedLimit);
+  switch (table) {
+    case "residents":
+      return getResidentsPage(db, cursor, limit);
+    case "emergency_contacts":
+      return toPage(table, await listRowsById(db, emergencyContacts, cursor, limit), limit);
+    case "parkings":
+      return toPage(table, await listRowsById(db, parkings, cursor, limit), limit);
+    case "parking_plates":
+      return toPage(table, await listRowsById(db, parkingPlates, cursor, limit), limit);
+    case "repair_requests":
+      return toPage(table, await listRowsById(db, repairRequests, cursor, limit), limit);
+    case "renovation_applications":
+      return toPage(table, await listRowsById(db, renovationApplications, cursor, limit), limit);
+    case "resource_folders":
+      return toPage(table, await listRowsById(db, resourceFolders, cursor, limit), limit);
+    case "resource_files":
+      return toPage(table, await listRowsById(db, resourceFiles, cursor, limit), limit);
+    case "invited_users":
+      return toPage(table, await listRowsById(db, invitedUsers, cursor, limit), limit);
+  }
+}
+function identityForRecord(table, record) {
+  if (table === "invited_users") {
+    return record.email ? { keyField: "email", keyValue: record.email } : null;
+  }
+  return record.id === void 0 || record.id === null ? null : { keyField: "id", keyValue: record.id };
+}
+function timestampForRecord(record) {
+  const candidate = record.updatedAt ?? record.createdAt;
+  if (candidate instanceof Date) {
+    return candidate.toISOString();
+  }
+  if (typeof candidate === "string" && Number.isFinite(Date.parse(candidate))) {
+    return candidate;
+  }
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function countResult(result, summary) {
+  if (result.action === "inserted") {
+    summary.inserted += 1;
+  } else if (result.action === "updated" || result.action === "upserted") {
+    summary.updated += 1;
+  } else {
+    summary.skipped += 1;
+  }
+}
+async function runBaselinePage(input) {
+  const { table, cursor = 0 } = baselineRunSchema.parse(input);
+  const limit = normalizeLimit(input.limit);
+  const initial = {
+    success: false,
+    table,
+    cursor,
+    processed: 0,
+    inserted: 0,
+    updated: 0,
+    skipped: 0,
+    failed: 0,
+    nextCursor: null,
+    hasMore: false,
+    retryRequired: false,
+    errors: [],
+    message: ""
+  };
+  if (LOCAL_SYSTEM_ID !== "community-management") {
+    return { ...initial, message: "Baseline import is only available on community-management" };
+  }
+  if (!SYNC_TARGET_URL || !SYNC_API_KEY) {
+    return { ...initial, message: "Synchronization target or API key is not configured" };
+  }
+  const endpoint = new URL(`${SYNC_TARGET_URL.replace(/\/+$/, "")}/api/sync/baseline`);
+  endpoint.searchParams.set("table", table);
+  endpoint.searchParams.set("cursor", String(cursor));
+  endpoint.searchParams.set("limit", String(limit));
+  let page;
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        "X-Sync-Source": LOCAL_SYSTEM_ID,
+        "X-Sync-Api-Key": SYNC_API_KEY
+      },
+      signal: AbortSignal.timeout(3e4)
+    });
+    if (!response.ok) {
+      return { ...initial, message: `Source baseline request failed with HTTP ${response.status}` };
+    }
+    page = await response.json();
+  } catch (error) {
+    return {
+      ...initial,
+      message: `Source baseline request failed: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+  if (page.table !== table || !Array.isArray(page.records)) {
+    return { ...initial, message: "Source returned an invalid baseline page" };
+  }
+  const summary = { ...initial, hasMore: Boolean(page.hasMore) };
+  for (const record of page.records) {
+    const identity = identityForRecord(table, record);
+    if (!identity) {
+      summary.failed += 1;
+      summary.errors.push(`${table}: missing source record identifier`);
+      continue;
+    }
+    const result = await handleSyncRequest({
+      operation: "create",
+      table,
+      data: record,
+      keyField: identity.keyField,
+      keyValue: identity.keyValue,
+      sourceSystem: REMOTE_SYSTEM_ID,
+      timestamp: timestampForRecord(record),
+      mode: "baseline"
+    });
+    summary.processed += 1;
+    if (!result.success) {
+      summary.failed += 1;
+      summary.errors.push(`${table}:${String(record.id ?? "record")} - ${result.message}`);
+      continue;
+    }
+    countResult(result, summary);
+  }
+  if (summary.failed > 0) {
+    return {
+      ...summary,
+      success: false,
+      retryRequired: true,
+      nextCursor: cursor,
+      message: "Baseline page stopped because one or more records failed; retry the same cursor after review"
+    };
+  }
+  return {
+    ...summary,
+    success: true,
+    nextCursor: page.hasMore ? page.nextCursor : null,
+    message: page.hasMore ? "Baseline page imported" : "Baseline table imported"
+  };
+}
+async function getSyncMappingSummary(originSystem = REMOTE_SYSTEM_ID) {
+  try {
+    const db = await getDb();
+    if (!db) {
+      return { ready: false, originSystem, counts: {}, message: "Synchronization database is unavailable" };
+    }
+    const rows = await db.select({
+      entityType: syncRecordMappings.entityType,
+      recordCount: sql2`count(*)`
+    }).from(syncRecordMappings).where(eq6(syncRecordMappings.originSystem, originSystem)).groupBy(syncRecordMappings.entityType);
+    const counts = Object.fromEntries(rows.map((row) => [
+      row.entityType,
+      Number(row.recordCount)
+    ]));
+    return { ready: true, originSystem, counts, message: "Synchronization mapping summary is ready" };
+  } catch (error) {
+    return {
+      ready: false,
+      originSystem,
+      counts: {},
+      message: `Synchronization mapping summary is unavailable: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+}
+
+// server/sync-baseline-routes.ts
+function hasAuthorizedKey(req, apiKey) {
+  const requestApiKey = req.headers["x-sync-api-key"];
+  return typeof requestApiKey === "string" && Boolean(apiKey) && requestApiKey === apiKey;
+}
+function sourceHeader(req) {
+  const source = req.headers["x-sync-source"];
+  return typeof source === "string" && source.trim() ? source.trim() : null;
+}
+function createSyncBaselineRouter(options = {}) {
+  const router3 = Router4();
+  const apiKey = options.apiKey ?? SYNC_API_KEY;
+  const localSystemId = options.localSystemId ?? LOCAL_SYSTEM_ID;
+  const remoteSystemId = options.remoteSystemId ?? REMOTE_SYSTEM_ID;
+  const getPage = options.getPage ?? getBaselinePage;
+  const runPage = options.runPage ?? runBaselinePage;
+  const getMappingSummary = options.getMappingSummary ?? getSyncMappingSummary;
+  router3.get("/sync/baseline", async (req, res) => {
+    if (!hasAuthorizedKey(req, apiKey)) {
+      return res.status(401).json({ success: false, message: "Invalid API key" });
+    }
+    if (sourceHeader(req) !== remoteSystemId) {
+      return res.status(403).json({ success: false, message: "Unexpected baseline source" });
+    }
+    const parsed = baselinePageQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid baseline query",
+        issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message }))
+      });
+    }
+    try {
+      const { table, cursor = 0, limit } = parsed.data;
+      const page = await getPage(table, cursor, limit);
+      return res.status(200).json(page);
+    } catch (error) {
+      console.error("[SYNC] \u57FA\u6E96\u532F\u51FA\u7AEF\u9EDE\u932F\u8AA4:", error instanceof Error ? error.message : String(error));
+      return res.status(503).json({ success: false, message: "Baseline source is unavailable" });
+    }
+  });
+  router3.post("/sync/baseline/run", async (req, res) => {
+    if (!hasAuthorizedKey(req, apiKey)) {
+      return res.status(401).json({ success: false, message: "Invalid API key" });
+    }
+    if (sourceHeader(req) !== localSystemId) {
+      return res.status(403).json({ success: false, message: "Baseline run must originate from this system" });
+    }
+    const parsed = baselineRunSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid baseline run body",
+        issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message }))
+      });
+    }
+    try {
+      const result = await runPage(parsed.data);
+      return res.status(result.success ? 200 : 422).json(result);
+    } catch (error) {
+      console.error("[SYNC] \u57FA\u6E96\u56DE\u586B\u7AEF\u9EDE\u932F\u8AA4:", error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ success: false, message: "Baseline import failed" });
+    }
+  });
+  router3.get("/sync/mappings/summary", async (req, res) => {
+    if (!hasAuthorizedKey(req, apiKey)) {
+      return res.status(401).json({ ready: false, message: "Invalid API key" });
+    }
+    const source = sourceHeader(req);
+    if (source !== localSystemId && source !== remoteSystemId) {
+      return res.status(403).json({ ready: false, message: "Unexpected mapping summary source" });
+    }
+    try {
+      const result = await getMappingSummary();
+      return res.status(result.ready ? 200 : 503).json(result);
+    } catch (error) {
+      console.error("[SYNC] \u6620\u5C04\u6458\u8981\u7AEF\u9EDE\u932F\u8AA4:", error instanceof Error ? error.message : String(error));
+      return res.status(503).json({ ready: false, message: "Synchronization mapping summary is unavailable" });
+    }
+  });
+  return router3;
+}
+var sync_baseline_routes_default = createSyncBaselineRouter();
+
 // server/_core/index.ts
 function isPortAvailable(port) {
   return new Promise((resolve) => {
@@ -3792,6 +4108,7 @@ function createApp() {
   app.use("/api/residents", residentsExportRouter);
   app.use("/api", upload_routes_default);
   app.use("/api", sync_routes_default);
+  app.use("/api", sync_baseline_routes_default);
   app.use(
     "/api/trpc",
     createExpressMiddleware({
