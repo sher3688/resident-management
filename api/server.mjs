@@ -1336,16 +1336,11 @@ async function syncMappedRecord(db, req, entityTable, label, transform, findExis
     return { success: true, message: "Skipped - duplicate or stale source event", action: "skipped" };
   }
   if (req.operation === "delete") {
-    if (mapping) {
-      const { eq: eq6 } = await import("drizzle-orm");
-      await db.delete(entityTable).where(eq6(entityTable.id, Number(mapping.localRecordId)));
-    } else if (findExisting) {
-      const naturalMatch = await findExisting(preparedData(req.data));
-      if (naturalMatch) {
-        const { eq: eq6 } = await import("drizzle-orm");
-        await db.delete(entityTable).where(eq6(entityTable.id, naturalMatch.id));
-      }
+    if (!mapping) {
+      return { success: true, message: `Skipped - no mapping for ${label} delete`, action: "skipped" };
     }
+    const { eq: eq6 } = await import("drizzle-orm");
+    await db.delete(entityTable).where(eq6(entityTable.id, Number(mapping.localRecordId)));
     await deleteRecordMapping(db, req);
     return { success: true, message: `${label} deleted`, action: "deleted" };
   }
@@ -1385,6 +1380,9 @@ async function syncResident(db, req) {
   const existing = mapping ? await db.select().from(residents2).where(eq6(residents2.id, Number(mapping.localRecordId))).limit(1) : await db.select().from(residents2).where(eq6(residents2.unitNumber, unitNumber)).limit(1);
   const resident = existing[0] ?? null;
   if (req.operation === "delete") {
+    if (!mapping) {
+      return { success: true, message: "Skipped - no mapping for resident delete", action: "skipped" };
+    }
     if (resident) {
       const parkingRows = await db.select({ id: parkings2.id }).from(parkings2).where(eq6(parkings2.residentId, resident.id));
       const parkingIds = parkingRows.map((row) => row.id);

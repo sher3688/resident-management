@@ -175,17 +175,13 @@ async function syncMappedRecord(
   }
 
   if (req.operation === "delete") {
-    if (mapping) {
-      const { eq } = await import("drizzle-orm");
-      await db.delete(entityTable).where(eq(entityTable.id, Number(mapping.localRecordId)));
-    } else if (findExisting) {
-      const naturalMatch = await findExisting(preparedData(req.data));
-      if (naturalMatch) {
-        const { eq } = await import("drizzle-orm");
-        await db.delete(entityTable).where(eq(entityTable.id, naturalMatch.id));
-      }
+    // 未建立來源映射時不能安全判斷本機哪一筆應刪除；採取 no-op 而非自然鍵猜測，避免誤刪。
+    if (!mapping) {
+      return { success: true, message: `Skipped - no mapping for ${label} delete`, action: "skipped" };
     }
 
+    const { eq } = await import("drizzle-orm");
+    await db.delete(entityTable).where(eq(entityTable.id, Number(mapping.localRecordId)));
     await deleteRecordMapping(db, req);
     return { success: true, message: `${label} deleted`, action: "deleted" };
   }
@@ -238,6 +234,11 @@ async function syncResident(db: any, req: SyncRequest): Promise<SyncResponse> {
   const resident = existing[0] ?? null;
 
   if (req.operation === "delete") {
+    // 單位號不是跨系統不可變 ID；沒有映射時不可用它猜測並刪除本機住戶。
+    if (!mapping) {
+      return { success: true, message: "Skipped - no mapping for resident delete", action: "skipped" };
+    }
+
     if (resident) {
       const parkingRows = await db.select({ id: parkings.id }).from(parkings).where(eq(parkings.residentId, resident.id));
       const parkingIds = parkingRows.map((row: { id: number }) => row.id);
