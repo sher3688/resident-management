@@ -14,6 +14,18 @@ const validEvent = {
   timestamp: "2026-07-23T00:00:00.000Z",
 } as const;
 
+const supportedTables = [
+  "residents",
+  "emergency_contacts",
+  "repair_requests",
+  "renovation_applications",
+  "resource_folders",
+  "resource_files",
+  "invited_users",
+  "parkings",
+  "parking_plates",
+] as const;
+
 async function startTestServer(handler: (request: SyncRequest) => Promise<SyncResponse>) {
   const app = express();
   app.use(express.json());
@@ -71,6 +83,23 @@ describe("POST /api/sync", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, action: "updated" });
     expect(handler).toHaveBeenCalledWith(validEvent);
+  });
+
+  it("accepts every supported table and delegates it to the synchronization handler", async () => {
+    const handler = vi.fn<(request: SyncRequest) => Promise<SyncResponse>>()
+      .mockResolvedValue({ success: true, message: "Handled", action: "updated" });
+    const { server, url } = await startTestServer(handler);
+    servers.push(server);
+
+    for (const table of supportedTables) {
+      const event = { ...validEvent, table };
+      const response = await post(url, event);
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, action: "updated" });
+    }
+
+    expect(handler).toHaveBeenCalledTimes(supportedTables.length);
+    expect(handler.mock.calls.map(([request]) => request.table)).toEqual(supportedTables);
   });
 
   it("rejects a missing or invalid shared key before inspecting the body", async () => {
