@@ -1113,6 +1113,7 @@ init_schema();
 // server/sync-handler.ts
 init_db();
 init_env();
+init_schema();
 
 // server/sync-mapping.ts
 init_schema();
@@ -1247,6 +1248,19 @@ var SYNC_API_KEY = ENV.syncApiKey;
 var SYNC_TARGET_URL = ENV.syncTargetUrl.replace(/\/+$/, "");
 var LOCAL_SYSTEM_ID = ENV.syncSystemId;
 var REMOTE_SYSTEM_ID = LOCAL_SYSTEM_ID === "community-management" ? "resident-management" : "community-management";
+async function checkSyncStorage() {
+  try {
+    const db = await getDb();
+    if (!db) {
+      return { ready: false, message: "Synchronization database is unavailable" };
+    }
+    await db.select({ id: syncRecordMappings.id }).from(syncRecordMappings).limit(1);
+    return { ready: true, message: "Synchronization mapping storage is ready" };
+  } catch (error) {
+    console.warn("[SYNC] \u6620\u5C04\u5132\u5B58\u5C64\u5065\u5EB7\u6AA2\u67E5\u5931\u6557:", error instanceof Error ? error.message : String(error));
+    return { ready: false, message: "Synchronization mapping storage is unavailable" };
+  }
+}
 async function syncToRemote(operation, table, data, keyField, keyValue) {
   if (!SYNC_TARGET_URL || !SYNC_API_KEY) {
     console.warn("[SYNC] \u7F3A\u5C11 SYNC_TARGET_URL \u6216 SYNC_API_KEY\uFF0C\u8DF3\u904E\u540C\u6B65");
@@ -3678,6 +3692,20 @@ function createSyncRouter(options = {}) {
   const localSystemId = options.localSystemId ?? LOCAL_SYSTEM_ID;
   const remoteSystemId = options.remoteSystemId ?? REMOTE_SYSTEM_ID;
   const handleRequest = options.handleRequest ?? handleSyncRequest;
+  const checkStorage = options.checkStorage ?? checkSyncStorage;
+  router3.get("/sync/health", async (req, res) => {
+    try {
+      const requestApiKey = req.headers["x-sync-api-key"];
+      if (typeof requestApiKey !== "string" || !apiKey || requestApiKey !== apiKey) {
+        return res.status(401).json({ ready: false, message: "Invalid API key" });
+      }
+      const result = await checkStorage();
+      return res.status(result.ready ? 200 : 503).json(result);
+    } catch (error) {
+      console.error("[SYNC] \u5065\u5EB7\u6AA2\u67E5\u7AEF\u9EDE\u932F\u8AA4:", error);
+      return res.status(503).json({ ready: false, message: "Synchronization mapping storage is unavailable" });
+    }
+  });
   router3.post("/sync", async (req, res) => {
     try {
       const requestApiKey = req.headers["x-sync-api-key"];

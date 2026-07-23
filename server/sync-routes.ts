@@ -9,11 +9,13 @@ import { Request, Response, Router } from "express";
 import { z } from "zod";
 import {
   handleSyncRequest,
+  checkSyncStorage,
   LOCAL_SYSTEM_ID,
   REMOTE_SYSTEM_ID,
   SYNC_API_KEY,
   type SyncRequest,
   type SyncResponse,
+  type SyncStorageHealth,
 } from "./sync-handler";
 
 const syncTables = [
@@ -47,12 +49,14 @@ export const syncRequestSchema = z.object({
 export type ValidatedSyncRequest = z.infer<typeof syncRequestSchema>;
 
 type SyncHandler = (request: SyncRequest) => Promise<SyncResponse>;
+type SyncStorageChecker = () => Promise<SyncStorageHealth>;
 
 export interface SyncRouterOptions {
   apiKey?: string;
   localSystemId?: string;
   remoteSystemId?: string;
   handleRequest?: SyncHandler;
+  checkStorage?: SyncStorageChecker;
 }
 
 /**
@@ -64,6 +68,22 @@ export function createSyncRouter(options: SyncRouterOptions = {}): Router {
   const localSystemId = options.localSystemId ?? LOCAL_SYSTEM_ID;
   const remoteSystemId = options.remoteSystemId ?? REMOTE_SYSTEM_ID;
   const handleRequest = options.handleRequest ?? handleSyncRequest;
+  const checkStorage = options.checkStorage ?? checkSyncStorage;
+
+  router.get("/sync/health", async (req: Request, res: Response) => {
+    try {
+      const requestApiKey = req.headers["x-sync-api-key"];
+      if (typeof requestApiKey !== "string" || !apiKey || requestApiKey !== apiKey) {
+        return res.status(401).json({ ready: false, message: "Invalid API key" });
+      }
+
+      const result = await checkStorage();
+      return res.status(result.ready ? 200 : 503).json(result);
+    } catch (error) {
+      console.error("[SYNC] 健康檢查端點錯誤:", error);
+      return res.status(503).json({ ready: false, message: "Synchronization mapping storage is unavailable" });
+    }
+  });
 
   router.post("/sync", async (req: Request, res: Response) => {
     try {

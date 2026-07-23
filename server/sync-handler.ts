@@ -7,6 +7,7 @@
 
 import { getDb } from "./db";
 import { ENV } from "./_core/env";
+import { syncRecordMappings } from "../drizzle/schema";
 import {
   deleteMappingsByLocalRecordIds,
   deleteRecordMapping,
@@ -40,6 +41,29 @@ export interface SyncResponse {
   success: boolean;
   message: string;
   action?: "inserted" | "updated" | "deleted" | "skipped" | "upserted";
+}
+
+export interface SyncStorageHealth {
+  ready: boolean;
+  message: string;
+}
+
+/**
+ * 唯讀驗證跨系統映射表是否可用。此函式不會回傳任何住戶或映射資料。
+ */
+export async function checkSyncStorage(): Promise<SyncStorageHealth> {
+  try {
+    const db = await getDb();
+    if (!db) {
+      return { ready: false, message: "Synchronization database is unavailable" };
+    }
+
+    await db.select({ id: syncRecordMappings.id }).from(syncRecordMappings).limit(1);
+    return { ready: true, message: "Synchronization mapping storage is ready" };
+  } catch (error) {
+    console.warn("[SYNC] 映射儲存層健康檢查失敗:", error instanceof Error ? error.message : String(error));
+    return { ready: false, message: "Synchronization mapping storage is unavailable" };
+  }
 }
 
 /**

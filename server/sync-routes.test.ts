@@ -2,7 +2,7 @@ import express from "express";
 import type { Server } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSyncRouter } from "./sync-routes";
-import type { SyncRequest, SyncResponse } from "./sync-handler";
+import type { SyncRequest, SyncResponse, SyncStorageHealth } from "./sync-handler";
 
 const validEvent = {
   operation: "update",
@@ -26,7 +26,10 @@ const supportedTables = [
   "parking_plates",
 ] as const;
 
-async function startTestServer(handler: (request: SyncRequest) => Promise<SyncResponse>) {
+async function startTestServer(
+  handler: (request: SyncRequest) => Promise<SyncResponse>,
+  checkStorage: () => Promise<SyncStorageHealth> = async () => ({ ready: true, message: "Ready" }),
+) {
   const app = express();
   app.use(express.json());
   app.use("/api", createSyncRouter({
@@ -34,6 +37,7 @@ async function startTestServer(handler: (request: SyncRequest) => Promise<SyncRe
     localSystemId: "community-management",
     remoteSystemId: "resident-management",
     handleRequest: handler,
+    checkStorage,
   }));
 
   const server = await new Promise<Server>((resolve) => {
@@ -48,6 +52,15 @@ async function startTestServer(handler: (request: SyncRequest) => Promise<SyncRe
     server,
     url: `http://127.0.0.1:${address.port}/api/sync`,
   };
+}
+
+async function getHealth(url: string, headers: Record<string, string> = {}) {
+  return fetch(`${url.replace(/\/sync$/, "")}/sync/health`, {
+    headers: {
+      "X-Sync-Api-Key": "test-sync-key",
+      ...headers,
+    },
+  });
 }
 
 async function post(url: string, body: unknown, headers: Record<string, string> = {}) {
@@ -70,6 +83,36 @@ describe("POST /api/sync", () => {
     await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     })));
+  });
+
+  it("returns mapping storage readiness only to callers with the shared key", async () => {
+    const handler = vi.fn<(request: SyncRequest) => Promise<SyncResponse>>();
+    const checkStorage = vi.fn<() => Promise<SyncStorageHealth>>()
+      .mockResolvedValue({ ready: true, message: "Synchronization mapping storage is ready" });
+    const { server, url } = await startTestServer(handler, checkStorage);
+    servers.push(server);
+
+    const authorized = await getHealth(url);
+    expect(authorized.status).toBe(200);
+    await expect(authorized.json()).resolves.toEqual({ ready: true, message: "Synchronization mapping storage is ready" });
+    expect(checkStorage).toHaveBeenCalledTimes(1);
+
+    const unauthorized = await getHealth(url, { "X-Sync-Api-Key": "wrong-key" });
+    expect(unauthorized.status).toBe(401);
+    await expect(unauthorized.json()).resolves.toEqual({ ready: false, message: "Invalid API key" });
+    expect(checkStorage).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a bounded unavailable result when mapping storage cannot be reached", async () => {
+    const handler = vi.fn<(request: SyncRequest) => Promise<SyncResponse>>();
+    const checkStorage = vi.fn<() => Promise<SyncStorageHealth>>()
+      .mockResolvedValue({ ready: false, message: "Synchronization mapping storage is unavailable" });
+    const { server, url } = await startTestServer(handler, checkStorage);
+    servers.push(server);
+
+    const response = await getHealth(url);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ ready: false, message: "Synchronization mapping storage is unavailable" });
   });
 
   it("accepts an authorized, well-formed event from the configured remote system", async () => {
